@@ -21,23 +21,23 @@ def rad(a):
 
 # Some global parameters
 
-A  = 0.5     # Planform area of the plane [m2]
+A  = 3     # Planform area of the plane [m2]
 pm  = 1      # Mass of plane [kg]
-k0    =  10       # Inital springforce of the line [N/m]
+k0    =  1       # Inital springforce of the line [N/m]
 g  = 9.81    # Gavitational acceleration [m/s2]
 rho = 1.4    # Airdensity [kg/m3]
 v0 = 10        # Launch speed [m/s]
 gamma0 = 80 # Launch angle
 Tmax = 150    # Maximal simulation time [s]
-dt  = 0.01    # Time step for the calculation [s]
-wst = 1000    # Winch Stall torque - Torque at zero speed [Nm]
-wzs = 100/60*2*np.pi #Winch zero torque speed  - Speed where the winch has no torque[rad/s]
-D=0.1 # Diameter of the cylinger collecting the wire [m]
+dt  = 0.005    # Time step for the calculation [s]
+wst = 200    # Winch Stall torque - Torque at zero speed [Nm]
+wzs = 3800/60*2*np.pi #Winch zero torque speed  - Speed where the winch has no torque[rad/s]
+D=0.055 # Diameter of the cylinger collecting the wire [m]
 
 # Some global variables
 cl = 0.0     # Lift Coefficient [-]
 cd = 0.0     # Drag coefficient [-]
-l    = [200]       # Acual length of the line [m]
+l    = [200]       # Length of the line between the winch and the plane [m]
 lw    = [0]        # Meters of line on the winch [m]
 lf  = [0]    # Lineforce [N]
 k    = k0        # Actual spring force of the line [N/m]
@@ -120,9 +120,9 @@ def Swinch():
     Returns the speed of which the winch pulls the rope
     If the torque is bigger than the stall torque, It is assumed that the winch stops
     """
-    M=lf[-1]/D # Torque acting on the cylinder
+    M=lf[-1]/D/2 # Torque acting on the cylinder
     omega.append(max(0,(1-M/wst)*wzs)) # Rotational speed of the winch
-    S = omega[-1]*D
+    S = omega[-1]*D/2
     lw.append(lw[-1]+S)
     return S
 
@@ -156,7 +156,7 @@ def sumForces():
     vel = sqrt(np.power(u[-1],2)+np.power(v[-1],2))
 
     fx=-Fdrag(vel)*np.cos(rad(velAng))+lf[-1]*np.cos(rad(psi))-Flift(vel)*np.sin(rad(velAng))
-    fy=-Fdrag(vel)*np.sin(rad(velAng))-lf[-1]*np.sin(rad(psi))+Flift(vel)*np.cos(rad(velAng))-g/pm
+    fy=-Fdrag(vel)*np.sin(rad(velAng))-lf[-1]*np.sin(rad(psi))+Flift(vel)*np.cos(rad(velAng))-g*pm
 
     return fx,fy
 
@@ -207,13 +207,13 @@ if __name__=="__main__":
     plot(x,y)
     #axes().set_aspect('equal', 'datalim')
     subplot(3,1,2)
-    plot(x,lf)
-    xlabel("X-Position [m]")
-    ylabel("Force in the wire [N]")
+    plot(T,lw)
+    xlabel("Time [s]")
+    ylabel("Wire on winch [m]")
     subplot(3,1,3)
-    plot(x,omega)
-    xlabel("X-Position [m]")
-    ylabel("Winch speed [rad/s]")
+    plot(T,omega)
+    xlabel("Time [s]")
+    ylabel("Winch Speed")
     show()
     print "Hmax: ",max(y),"Energy: ",y[-1]*g*pm+0.5*pm*(u[-1]**2+v[-1]**2)**0.5
 
