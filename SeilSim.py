@@ -1,0 +1,219 @@
+import numpy as np
+from math import *
+from pylab import *
+
+# Kommentarer:
+#     - Det virker som om
+
+def deg(a):
+    """
+    Returns the argument in degrees
+    """
+
+    return float(a)*180/np.pi
+
+def rad(a):
+    """
+    Returns the argument in radians
+    """
+
+    return float(a)/180*np.pi
+
+# Some global parameters
+
+A  = 0.5     # Planform area of the plane [m2]
+pm  = 1      # Mass of plane [kg]
+k0    =  10       # Inital springforce of the line [N/m]
+g  = 9.81    # Gavitational acceleration [m/s2]
+rho = 1.4    # Airdensity [kg/m3]
+v0 = 10        # Launch speed [m/s]
+gamma0 = 80 # Launch angle
+Tmax = 150    # Maximal simulation time [s]
+dt  = 0.01    # Time step for the calculation [s]
+wst = 1000    # Winch Stall torque - Torque at zero speed [Nm]
+wzs = 100/60*2*np.pi #Winch zero torque speed  - Speed where the winch has no torque[rad/s]
+D=0.1 # Diameter of the cylinger collecting the wire [m]
+
+# Some global variables
+cl = 0.0     # Lift Coefficient [-]
+cd = 0.0     # Drag coefficient [-]
+l    = [200]       # Acual length of the line [m]
+lw    = [0]        # Meters of line on the winch [m]
+lf  = [0]    # Lineforce [N]
+k    = k0        # Actual spring force of the line [N/m]
+gamma = gamma0   # Angle between plane and ground [deg]
+psi = 0.0      # Angle between line and ground [deg]
+x   = [0.0]      # Positon of the plane in x direction [m]
+y   = [0.0]      # Position of the plane in y direction [m]
+u   = [v0*math.cos(rad(gamma))]      # Plane velocity in x direction [m/s]
+v   = [v0*math.sin(rad(gamma))]      # Plane velocity in y direction [m/s]
+T  = [0.0]     # Accumulated time [s]
+attAng = gamma # Angle of attack [deg]
+velAng = gamma # The planes velocity angle [deg]
+omega = [0]    # Speed of the winch [rad/s]
+
+
+def calcCd():
+    """
+    Returns the drag coefficient
+    """
+    return cl**2/13 + 0.002
+
+def calcCl():
+    """
+    Returns the lift coefficient
+    """
+    return 2*np.pi*rad(attAng)
+
+def calcVelAng():
+    """
+    Returns the angle of the velocity vector of the plane
+    """
+    return deg(math.atan2(v[-1],u[-1]))
+
+
+def calcAttAng():
+    """
+    Returns the angle of attack for the plane
+    """
+    return gamma-velAng
+
+def calcGamma():
+    """
+    Returns the plane angle.
+    Assumes the plane flies with gamma0 degrees towards the line all the time
+    """
+
+
+    return gamma0-psi#deg(math.atan2(v[-1],u[-1]))
+
+
+
+def calcPsi():
+    """
+    Returns the line angle
+
+    """
+
+    return deg(math.atan2(y[-1],(l[0]-x[-1])))
+
+def Flift(vel):
+    """
+    Returns the lift force of the plane based on the input velocity
+    Flift = cl*v^2*rho/2*A
+    """
+
+    return cl*vel**2*rho/2*A
+
+
+def Fdrag(vel):
+    """
+    Returns the grad force of the plane based on the input velocity
+    Flift = cd*v^2*rho/2*A
+    """
+
+    return cd*vel**2*rho/2*A
+
+
+def Swinch():
+    """
+    Returns the speed of which the winch pulls the rope
+    If the torque is bigger than the stall torque, It is assumed that the winch stops
+    """
+    M=lf[-1]/D # Torque acting on the cylinder
+    omega.append(max(0,(1-M/wst)*wzs)) # Rotational speed of the winch
+    S = omega[-1]*D
+    lw.append(lw[-1]+S)
+    return S
+
+def kLine():
+    """
+    Returns the spring constant of the line
+    As the line is shortened will the springconstant increase
+    Assumes the constant is reduced inverse to the relative length
+    """
+    return  k0*l[0]/(l[0]-lw[-1])
+
+def lLine():
+    """
+    Returns the actual length of the line
+    """
+    return ((l[0]-x[-1])**2+y[-1]**2)**0.5
+
+def fLine():
+    """
+    Returns the force in the line
+    dF=(dL+winchspeed)/k
+    """
+    return lf[-1]+((l[-1]-l[-2])+Swinch())*kLine()
+
+
+def sumForces():
+    """
+    Calculates the resulting forces acting on the plane
+    returns the fx and fy
+    """
+    vel = sqrt(np.power(u[-1],2)+np.power(v[-1],2))
+
+    fx=-Fdrag(vel)*np.cos(rad(velAng))+lf[-1]*np.cos(rad(psi))-Flift(vel)*np.sin(rad(velAng))
+    fy=-Fdrag(vel)*np.sin(rad(velAng))-lf[-1]*np.sin(rad(psi))+Flift(vel)*np.cos(rad(velAng))-g/pm
+
+    return fx,fy
+
+
+def Euler():
+    """
+    Calculates the new position of the plane using forward Euler iteration
+    """
+    fx,fy = sumForces()
+    ax=fx/pm
+    ay=fy/pm
+
+    u.append(u[-1]+ax*dt)
+    v.append(v[-1]+ay*dt)
+
+    x.append(x[-1]+u[-1]*dt)
+    y.append(y[-1]+v[-1]*dt)
+
+
+def simulate():
+    global gamma,psi,wf,velAng,attAng,cd,cl
+    """
+    Runs the simulation
+    """
+    while T[-1]<=Tmax and y[-1] >= 0.0:
+
+        psi = calcPsi()
+        gamma = calcGamma()
+        velAng = calcVelAng()
+        attAng = calcAttAng()
+        cl=calcCl()
+        cd=calcCd()
+        l.append(lLine())
+        lf.append(fLine())
+        Euler()
+        T.append(T[-1]+dt)
+        #print T[-1],attAng,gamma
+        if x[-1]>l[0]:
+            break
+
+
+
+if __name__=="__main__":
+    simulate()
+    subplot(3,1,1)
+    xlabel("X-Position [m]")
+    ylabel("Y-Position [m]")
+    plot(x,y)
+    #axes().set_aspect('equal', 'datalim')
+    subplot(3,1,2)
+    plot(x,lf)
+    xlabel("X-Position [m]")
+    ylabel("Force in the wire [N]")
+    subplot(3,1,3)
+    plot(x,omega)
+    xlabel("X-Position [m]")
+    ylabel("Winch speed [rad/s]")
+    show()
+    print "Hmax: ",max(y),"Energy: ",y[-1]*g*pm+0.5*pm*(u[-1]**2+v[-1]**2)**0.5
+
