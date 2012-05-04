@@ -30,7 +30,7 @@ v0 = 10        # Launch speed [m/s]
 gamma0 = 80 # Launch angle
 Tmax = 150    # Maximal simulation time [s]
 dt  = 0.005    # Time step for the calculation [s]
-wst = 200    # Winch Stall torque - Torque at zero speed [Nm]
+wst = 19    # Winch Stall torque - Torque at zero speed [Nm]
 wzs = 3800/60*2*np.pi #Winch zero torque speed  - Speed where the winch has no torque[rad/s]
 D=0.055 # Diameter of the cylinger collecting the wire [m]
 
@@ -120,9 +120,9 @@ def Swinch():
     Returns the speed of which the winch pulls the rope
     If the torque is bigger than the stall torque, It is assumed that the winch stops
     """
-    M=lf[-1]/D/2 # Torque acting on the cylinder
-    omega.append(max(0,(1-M/wst)*wzs)) # Rotational speed of the winch
-    S = omega[-1]*D/2
+    M=lf[-1]/D/2 # Torque acting on the cylinder [Nm]
+    omega.append(max(0,(1-M/wst)*wzs)) # Rotational speed of the winch [rad/s]
+    S = omega[-1]*D/2*dt # The amount of line the winch collects [m]
     lw.append(lw[-1]+S)
     return S
 
