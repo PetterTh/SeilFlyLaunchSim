@@ -2,8 +2,6 @@ import numpy as np
 from math import *
 from pylab import *
 
-# Kommentarer:
-#     - Det virker som om
 
 def deg(a):
     """
@@ -21,9 +19,9 @@ def rad(a):
 
 # Some global parameters
 
-A  = 1     # Planform area of the plane [m2]
+A  = 0.5     # Planform area of the plane [m2]
 pm  = 1      # Mass of plane [kg]
-k0    =  10       # Inital springforce of the line [N/m]
+k0    =  100       # Inital springforce of the line [N/m]
 g  = 9.81    # Gavitational acceleration [m/s2]
 rho = 1.4    # Airdensity [kg/m3]
 v0 = 10        # Launch speed [m/s]
@@ -33,17 +31,19 @@ dt  = 0.005    # Time step for the calculation [s]
 wst = 19    # Winch Stall torque - Torque at zero speed [Nm]
 wzs = 3800/60*2*np.pi #Winch zero torque speed  - Speed where the winch has no torque[rad/s]
 D=0.055 # Diameter of the cylinger collecting the wire [m]
+l0 = 200 # Wirelength, witouth tention [m]
+lf0 = 600 # Preforce applied to the wire [N]
 
 # Some global variables
 cl = 0.0     # Lift Coefficient [-]
 cd = 0.0     # Drag coefficient [-]
-l    = [200]       # Length of the line between the winch and the plane [m]
+l    = [l0+lf0/k0]       # Length of the line between the winch and the plane [m]
 lw    = [0]        # Meters of line on the winch [m]
-lf  = [10]    # Lineforce [N]
+lf  = [lf0]    # Lineforce [N]
 k    = k0        # Actual spring force of the line [N/m]
 gamma = gamma0   # Angle between plane and ground [deg]
 psi = 0.0      # Angle between line and ground [deg]
-x   = [0.0]      # Positon of the plane in x direction [m]
+x   = [-l[0]]      # Positon of the plane in x direction [m]
 y   = [0.0]      # Position of the plane in y direction [m]
 u   = [v0*math.cos(rad(gamma))]      # Plane velocity in x direction [m/s]
 v   = [v0*math.sin(rad(gamma))]      # Plane velocity in y direction [m/s]
@@ -95,7 +95,7 @@ def calcPsi():
 
     """
 
-    return deg(math.atan2(y[-1],(l[0]-x[-1])))
+    return deg(math.atan2(y[-1],(-x[-1])))
 
 def Flift(vel):
     """
@@ -118,10 +118,10 @@ def Fdrag(vel):
 def Swinch():
     """
     Returns the speed of which the winch pulls the rope
-    If the torque is bigger than the stall torque, It is assumed that the winch stops
+    If the torque is bigger than the stall torque, It is assumed that the winch stops and does not reverse
     """
     M=lf[-1]*(D/2) # Torque acting on the cylinder [Nm]
-    omega.append(max(0,(1-M/wst)*wzs)) # Rotational speed of the winch [rad/s]
+    omega.append(min(max(0,(1-M/wst)),1)*wzs) # Rotational speed of the winch [rad/s]
     S = omega[-1]*(D/2)*dt # The amount of line the winch collects [m]
     lw.append(lw[-1]+S)
     return S
@@ -132,13 +132,14 @@ def kLine():
     As the line is shortened will the springconstant increase
     Assumes the constant is reduced inverse to the relative length
     """
+
     return  k0*l[0]/(l[0]-lw[-1])
 
 def lLine():
     """
     Returns the actual length of the line
     """
-    return ((l[0]-x[-1])**2+y[-1]**2)**0.5
+    return ((x[-1])**2+y[-1]**2)**0.5
 
 def fLine():
     """
@@ -194,7 +195,7 @@ def simulate():
         Euler()
         T.append(T[-1]+dt)
         #print T[-1],attAng,gamma
-        if x[-1]>l[0]:
+        if x[-1]>0:
             break
 
 
@@ -207,13 +208,13 @@ if __name__=="__main__":
     plot(x,y)
     #axes().set_aspect('equal', 'datalim')
     subplot(3,1,2)
-    plot(T,lw)
+    plot(T,lf)
     xlabel("Time [s]")
-    ylabel("Wire on winch [m]")
+    ylabel("Force in wire [N]")
     subplot(3,1,3)
     plot(T,omega)
     xlabel("Time [s]")
-    ylabel("Winch Speed")
+    ylabel("Winch Speed [rad/s]")
     show()
     print "Hmax: ",max(y),"Energy: ",y[-1]*g*pm+0.5*pm*(u[-1]**2+v[-1]**2)**0.5
 
