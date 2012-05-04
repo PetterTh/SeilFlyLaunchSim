@@ -21,7 +21,7 @@ def rad(a):
 
 A  = 0.5     # Planform area of the plane [m2]
 pm  = 1      # Mass of plane [kg]
-k0    =  100       # Inital springforce of the line [N/m]
+k0    =  100       # Inital springcoefficient of the line [N/m]
 g  = 9.81    # Gavitational acceleration [m/s2]
 rho = 1.4    # Airdensity [kg/m3]
 v0 = 10        # Launch speed [m/s]
@@ -32,7 +32,7 @@ wst = 19    # Winch Stall torque - Torque at zero speed [Nm]
 wzs = 3800/60*2*np.pi #Winch zero torque speed  - Speed where the winch has no torque[rad/s]
 D=0.055 # Diameter of the cylinger collecting the wire [m]
 l0 = 200 # Wirelength, witouth tention [m]
-lf0 = 600 # Preforce applied to the wire [N]
+lf0 = 100 # Preforce applied to the wire [N]
 
 # Some global variables
 cl = 0.0     # Lift Coefficient [-]
@@ -48,8 +48,8 @@ y   = [0.0]      # Position of the plane in y direction [m]
 u   = [v0*math.cos(rad(gamma))]      # Plane velocity in x direction [m/s]
 v   = [v0*math.sin(rad(gamma))]      # Plane velocity in y direction [m/s]
 T  = [0.0]     # Accumulated time [s]
-attAng = gamma # Angle of attack [deg]
-velAng = gamma # The planes velocity angle [deg]
+attAng = [0] # Angle of attack [deg]
+velAng = [gamma] # The planes velocity angle [deg]
 omega = [0]    # Speed of the winch [rad/s]
 
 
@@ -63,7 +63,7 @@ def calcCl():
     """
     Returns the lift coefficient
     """
-    return 2*np.pi*rad(attAng)
+    return 2*np.pi*rad(attAng[-1])
 
 def calcVelAng():
     """
@@ -76,7 +76,7 @@ def calcAttAng():
     """
     Returns the angle of attack for the plane
     """
-    return gamma-velAng
+    return gamma-velAng[-1]
 
 def calcGamma():
     """
@@ -146,7 +146,7 @@ def fLine():
     Returns the force in the line
     dF=(dL+winchspeed)/k
     """
-    return lf[-1]+((l[-1]-l[-2])+Swinch())*kLine()
+    return max(0,lf[-1]+((l[-1]-l[-2])+Swinch())*kLine())
 
 
 def sumForces():
@@ -156,8 +156,8 @@ def sumForces():
     """
     vel = sqrt(np.power(u[-1],2)+np.power(v[-1],2))
 
-    fx=-Fdrag(vel)*np.cos(rad(velAng))+lf[-1]*np.cos(rad(psi))-Flift(vel)*np.sin(rad(velAng))
-    fy=-Fdrag(vel)*np.sin(rad(velAng))-lf[-1]*np.sin(rad(psi))+Flift(vel)*np.cos(rad(velAng))-g*pm
+    fx=-Fdrag(vel)*np.cos(rad(velAng[-1]))+lf[-1]*np.cos(rad(psi))-Flift(vel)*np.sin(rad(velAng[-1]))
+    fy=-Fdrag(vel)*np.sin(rad(velAng[-1]))-lf[-1]*np.sin(rad(psi))+Flift(vel)*np.cos(rad(velAng[-1]))-g*pm
 
     return fx,fy
 
@@ -186,8 +186,8 @@ def simulate():
 
         psi = calcPsi()
         gamma = calcGamma()
-        velAng = calcVelAng()
-        attAng = calcAttAng()
+        velAng.append(calcVelAng())
+        attAng.append(calcAttAng())
         cl=calcCl()
         cd=calcCd()
         l.append(lLine())
@@ -212,9 +212,9 @@ if __name__=="__main__":
     xlabel("Time [s]")
     ylabel("Force in wire [N]")
     subplot(3,1,3)
-    plot(T,omega)
+    plot(T,attAng)
     xlabel("Time [s]")
-    ylabel("Winch Speed [rad/s]")
+    ylabel("Angle of attack [deg]")
     show()
     print "Hmax: ",max(y),"Energy: ",y[-1]*g*pm+0.5*pm*(u[-1]**2+v[-1]**2)**0.5
 
