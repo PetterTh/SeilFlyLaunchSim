@@ -21,9 +21,9 @@ def rad(a):
 
 # Some global parameters
 
-A  = 3     # Planform area of the plane [m2]
+A  = 1     # Planform area of the plane [m2]
 pm  = 1      # Mass of plane [kg]
-k0    =  1       # Inital springforce of the line [N/m]
+k0    =  10       # Inital springforce of the line [N/m]
 g  = 9.81    # Gavitational acceleration [m/s2]
 rho = 1.4    # Airdensity [kg/m3]
 v0 = 10        # Launch speed [m/s]
@@ -39,7 +39,7 @@ cl = 0.0     # Lift Coefficient [-]
 cd = 0.0     # Drag coefficient [-]
 l    = [200]       # Length of the line between the winch and the plane [m]
 lw    = [0]        # Meters of line on the winch [m]
-lf  = [0]    # Lineforce [N]
+lf  = [10]    # Lineforce [N]
 k    = k0        # Actual spring force of the line [N/m]
 gamma = gamma0   # Angle between plane and ground [deg]
 psi = 0.0      # Angle between line and ground [deg]
@@ -120,9 +120,9 @@ def Swinch():
     Returns the speed of which the winch pulls the rope
     If the torque is bigger than the stall torque, It is assumed that the winch stops
     """
-    M=lf[-1]/D/2 # Torque acting on the cylinder [Nm]
+    M=lf[-1]*(D/2) # Torque acting on the cylinder [Nm]
     omega.append(max(0,(1-M/wst)*wzs)) # Rotational speed of the winch [rad/s]
-    S = omega[-1]*D/2*dt # The amount of line the winch collects [m]
+    S = omega[-1]*(D/2)*dt # The amount of line the winch collects [m]
     lw.append(lw[-1]+S)
     return S
 
