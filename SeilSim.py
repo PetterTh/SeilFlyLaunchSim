@@ -21,23 +21,29 @@ def rad(a):
 
 A  = 0.5     # Planform area of the plane [m2]
 pm  = 1      # Mass of plane [kg]
-k0    =  10       # Springcoefficient of the line [N/m]
+k0    =  2*10**9*np.pi*0.005**2/4       # Springcoefficient of the line [N] E*pi*d^2/4
+"""
+Some Different E values:
+    Steel 210e9
+    Rubber 0.01e9-0.1e9
+    Nylon 2e9-4e9
+"""
 g  = 9.81    # Gavitational acceleration [m/s2]
 rho = 1.4    # Airdensity [kg/m3]
 v0 = 10        # Launch speed [m/s]
 gamma0 = 80 # Launch angle
 Tmax = 150    # Maximal simulation time [s]
-dt  = 0.002    # Time step for the calculation [s]
+dt  = 0.005    # Time step for the calculation [s]
 wst = 9.8    # Winch Stall torque - Torque at zero speed [Nm]
 wzs = 3800/60*2*np.pi #Winch zero torque speed  - Speed where the winch has no torque[rad/s]
 D=0.055 # Diameter of the cylinger collecting the wire [m]
 l0 = 200 # Wirelength, witouth tention [m]
-lf0 = 400 # Preforce applied to the wire [N]
+lf0 =600 # Preforce applied to the wire [N]
 
 # Some global variables
 cl = 0.0     # Lift Coefficient [-]
 cd = 0.0     # Drag coefficient [-]
-l    = [l0+lf0/k0]       # Length of the line between the winch and the plane [m]
+l    = [l0+lf0/k0*l0]       # Length of the line between the winch and the plane [m]
 lw    = [0]        # Meters of line on the winch [m]
 lf  = [lf0]    # Lineforce [N]
 k    = k0        # Actual spring force of the line [N/m]
@@ -165,6 +171,7 @@ def sumForces():
 def Euler():
     """
     Calculates the new position of the plane using forward Euler iteration
+    Does not allow the plane to go below y=0 as this is ground level
     """
     fx,fy = sumForces()
     ax=fx/pm
@@ -174,7 +181,7 @@ def Euler():
     v.append(v[-1]+ay*dt)
 
     x.append(x[-1]+u[-1]*dt)
-    y.append(y[-1]+v[-1]*dt)
+    y.append(max(y[-1]+v[-1]*dt,0))
 
 
 def simulate():
@@ -182,7 +189,7 @@ def simulate():
     """
     Runs the simulation
     """
-    while T[-1]<=Tmax and y[-1] >= 0.0:
+    while T[-1]<=Tmax and y[-1] >= -10.0:
 
         psi = calcPsi()
         gamma = calcGamma()
