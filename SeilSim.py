@@ -21,18 +21,18 @@ def rad(a):
 
 A  = 0.5     # Planform area of the plane [m2]
 pm  = 1      # Mass of plane [kg]
-k0    =  100       # Inital springcoefficient of the line [N/m]
+k0    =  10       # Springcoefficient of the line [N/m]
 g  = 9.81    # Gavitational acceleration [m/s2]
 rho = 1.4    # Airdensity [kg/m3]
 v0 = 10        # Launch speed [m/s]
 gamma0 = 80 # Launch angle
 Tmax = 150    # Maximal simulation time [s]
-dt  = 0.005    # Time step for the calculation [s]
-wst = 19    # Winch Stall torque - Torque at zero speed [Nm]
+dt  = 0.002    # Time step for the calculation [s]
+wst = 9.8    # Winch Stall torque - Torque at zero speed [Nm]
 wzs = 3800/60*2*np.pi #Winch zero torque speed  - Speed where the winch has no torque[rad/s]
 D=0.055 # Diameter of the cylinger collecting the wire [m]
 l0 = 200 # Wirelength, witouth tention [m]
-lf0 = 100 # Preforce applied to the wire [N]
+lf0 = 400 # Preforce applied to the wire [N]
 
 # Some global variables
 cl = 0.0     # Lift Coefficient [-]
@@ -117,7 +117,7 @@ def Fdrag(vel):
 
 def Swinch():
     """
-    Returns the speed of which the winch pulls the rope
+    Returns the length of wire which the winch collects during 1 dt
     If the torque is bigger than the stall torque, It is assumed that the winch stops and does not reverse
     """
     M=lf[-1]*(D/2) # Torque acting on the cylinder [Nm]
@@ -133,7 +133,7 @@ def kLine():
     Assumes the constant is reduced inverse to the relative length
     """
 
-    return  k0*l[0]/(l[0]-lw[-1])
+    return  k0#*l[0]/(l[0]-lw[-1])
 
 def lLine():
     """
@@ -146,7 +146,7 @@ def fLine():
     Returns the force in the line
     dF=(dL+winchspeed)/k
     """
-    return max(0,lf[-1]+((l[-1]-l[-2])+Swinch())*kLine())
+    return max(0,lf[-1]+((l[-1]-l[-2])+Swinch())/l[-1]*kLine())
 
 
 def sumForces():
@@ -199,9 +199,10 @@ def simulate():
             break
 
 
-
-if __name__=="__main__":
-    simulate()
+def plotSim():
+    """
+    Plots some graphs providing some information
+    """
     subplot(3,1,1)
     xlabel("X-Position [m]")
     ylabel("Y-Position [m]")
@@ -216,5 +217,9 @@ if __name__=="__main__":
     xlabel("Time [s]")
     ylabel("Angle of attack [deg]")
     show()
-    print "Hmax: ",max(y),"Energy: ",y[-1]*g*pm+0.5*pm*(u[-1]**2+v[-1]**2)**0.5
 
+
+if __name__=="__main__":
+    simulate()
+    print "Hmax: ",max(y),"Energy: ",y[-1]*g*pm+0.5*pm*(u[-1]**2+v[-1]**2)**0.5
+    plotSim()
