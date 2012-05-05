@@ -39,7 +39,7 @@ wzs = 3800/60*2*np.pi #Winch zero torque speed  - Speed where the winch has no t
 D=0.055 # Diameter of the cylinger collecting the wire [m]
 l0 = 200 # Distance between the winch and the pulley. The plane is assumed to start at the same location as the winch [m]
 pf =100 # Preforce applied to the wire [N]
-gammaR = 45 # Rate of gamma change [deg/s]. A maximal value of which the gamma can change per second. Used to limit the turn rate
+gammaR = 180 # Rate of gamma change [deg/s]. A maximal value of which the gamma can change per second. Used to limit the turn rate
 phase = 0 #
 """
 Each phase of the launch determines how the plane should behave:
@@ -68,7 +68,7 @@ T  = [0.0]     # Accumulated time [s]
 attAng = [0] # Angle of attack [deg]
 velAng = [gamma0] # The planes velocity angle [deg]
 omega = [0]    # Speed of the winch [rad/s]
-
+E = [0] # Total energy of the plane [J]
 
 def calcCd():
     """
@@ -240,6 +240,7 @@ def simulate():
         lf.append(fLine())
         Euler()
         T.append(T[-1]+dt)
+        E.append(y[-1]*g*pm+0.5*pm*(u[-1]**2+v[-1]**2))
         #print T[-1],attAng,gamma
 
         # Change phases
@@ -249,7 +250,7 @@ def simulate():
         if (u[-1]**2+v[-1]**2)**0.5>v0 and phase==1:
             phase = 2
             print "Phase 2: T:",T[-1],"X:",x[-1]
-        if psi > 75 and phase ==2:
+        if psi > 85 and phase ==2:
             phase = 3
             print "Phase 3: T:",T[-1],"X:",x[-1]
         if (y[-1]<50 or lf[-1]==0) and phase ==3:
@@ -266,23 +267,27 @@ def plotSim():
     """
     Plots some graphs providing some information
     """
-    subplot(3,1,1)
+    subplot(2,2,1)
     xlabel("X-Position [m]")
     ylabel("Y-Position [m]")
     plot(x,y)
     #axes().set_aspect('equal', 'datalim')
-    subplot(3,1,2)
+    subplot(2,2,2)
     plot(T,lf)
     xlabel("Time [s]")
     ylabel("Force in wire [N]")
-    subplot(3,1,3)
+    subplot(2,2,4)
     plot(T,attAng)
     xlabel("Time [s]")
     ylabel("Angle of attack [deg]")
+    subplot(2,2,3)
+    plot(x,E)
+    xlabel("X-Position [m]")
+    ylabel("Energy [J]")
     show()
 
 
 if __name__=="__main__":
     simulate()
-    print "Hmax: ",max(y),"Energy: ",y[-1]*g*pm+0.5*pm*(u[-1]**2+v[-1]**2)**0.5
+    print "Hmax: ",max(y),"EnergyMax: ",max(E)
     plotSim()
