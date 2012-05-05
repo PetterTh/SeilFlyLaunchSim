@@ -32,13 +32,14 @@ g  = 9.81    # Gavitational acceleration [m/s2]
 rho = 1.4    # Airdensity [kg/m3]
 v0 = 20        # Takeoff speed [m/s]
 gamma0 = 0 # Launch angle
-Tmax = 150    # Maximal simulation time [s]
+Tmax = 15    # Maximal simulation time [s]
 dt  = 0.01    # Time step for the calculation [s]
 wst = 9.8    # Winch Stall torque - Torque at zero speed [Nm]
 wzs = 3800/60*2*np.pi #Winch zero torque speed  - Speed where the winch has no torque[rad/s]
 D=0.055 # Diameter of the cylinger collecting the wire [m]
 l0 = 200 # Distance between the winch and the pulley. The plane is assumed to start at the same location as the winch [m]
 pf =100 # Preforce applied to the wire [N]
+gammaR = 45 # Rate of gamma change [deg/s]. A maximal value of which the gamma can change per second. Used to limit the turn rate
 phase = 0 #
 """
 Each phase of the launch determines how the plane should behave:
@@ -57,15 +58,15 @@ l    = [2*l0]       # Length of the line between the winch and the plane [m]
 lw    = [0]        # Meters of line on the winch [m]
 lf  = [0]    # Lineforce [N]
 k    = k0        # Actual spring force of the line [N/m]
-gamma = gamma0   # Angle between plane and ground [deg]
+gamma = [gamma0]   # Angle between plane and ground [deg]
 psi = 0.0      # Angle between line and ground [deg]
 x   = [-l[0]/2]      # Positon of the plane in x direction [m]
 y   = [0.0]      # Position of the plane in y direction [m]
-u   = [v0*math.cos(rad(gamma))]      # Plane velocity in x direction [m/s]
-v   = [v0*math.sin(rad(gamma))]      # Plane velocity in y direction [m/s]
+u   = [0]      # Plane velocity in x direction [m/s]
+v   = [0]      # Plane velocity in y direction [m/s]
 T  = [0.0]     # Accumulated time [s]
 attAng = [0] # Angle of attack [deg]
-velAng = [gamma] # The planes velocity angle [deg]
+velAng = [gamma0] # The planes velocity angle [deg]
 omega = [0]    # Speed of the winch [rad/s]
 
 
@@ -92,23 +93,30 @@ def calcAttAng():
     """
     Returns the angle of attack for the plane
     """
-    return gamma-velAng[-1]
+    return gamma[-1]-velAng[-1]
 
 def calcGamma():
     """
     Returns the plane angle.
     Assumes the plane flies with gamma0 degrees towards the line all the time
     """
+    goal = 0
     if phase == 0:
-        return gamma0
+        goal=gamma0
     if phase == 1:
-        return gamma0
+        goal=gamma0
     if phase == 2:
-        return 80-psi
+        goal=80-psi
     if phase == 3:
-        return -psi
+       goal= -psi
     if phase == 4:
-        return 45
+        goal=45
+    if goal < gamma[-1]:
+        return max(goal,gamma[-1]-gammaR*dt)
+    elif goal > gamma[-1]:
+        return min(goal,gamma[-1]+gammaR*dt)
+    else:
+        return gamma[-1]
 
 
 
@@ -223,7 +231,7 @@ def simulate():
     while T[-1]<=Tmax and y[-1] >= -10.0:
 
         psi = calcPsi()
-        gamma = calcGamma()
+        gamma.append(calcGamma())
         velAng.append(calcVelAng())
         attAng.append(calcAttAng())
         cl=calcCl()
@@ -237,12 +245,16 @@ def simulate():
         # Change phases
         if lf[-1]>pf and phase==0:
             phase = 1
+            print "Phase 1: T:",T[-1],"X:",x[-1]
         if (u[-1]**2+v[-1]**2)**0.5>v0 and phase==1:
             phase = 2
+            print "Phase 2: T:",T[-1],"X:",x[-1]
         if psi > 75 and phase ==2:
             phase = 3
+            print "Phase 3: T:",T[-1],"X:",x[-1]
         if (y[-1]<50 or lf[-1]==0) and phase ==3:
             phase = 4
+            print "Phase 4: T:",T[-1],"X:",x[-1]
 
         if y[-1]<-5:
             break
