@@ -19,9 +19,9 @@ def rad(a):
 
 # Some global parameters
 
-A  = 0.5     # Planform area of the plane [m2]
-pm  = 1      # Mass of plane [kg]
-k0    =  2*10**9*np.pi*0.005**2/4       # Springcoefficient of the line [N] E*pi*d^2/4
+A  = 0.6     # Planform area of the plane [m2]
+pm  = 2      # Mass of plane [kg]
+k0    =  2*10**9*np.pi*(1.3*10**-3)**2/4       # Springcoefficient of the line [N] E*pi*d^2/4
 """
 Some Different E values:
     Steel 210e9
@@ -30,26 +30,37 @@ Some Different E values:
 """
 g  = 9.81    # Gavitational acceleration [m/s2]
 rho = 1.4    # Airdensity [kg/m3]
-v0 = 10        # Launch speed [m/s]
-gamma0 = 80 # Launch angle
-Tmax = 150    # Maximal simulation time [s]
-dt  = 0.005    # Time step for the calculation [s]
+v0 = 0        # Launch speed [m/s]
+gamma0 = 0 # Launch angle
+Tmax = 10    # Maximal simulation time [s]
+dt  = 0.01    # Time step for the calculation [s]
 wst = 9.8    # Winch Stall torque - Torque at zero speed [Nm]
 wzs = 3800/60*2*np.pi #Winch zero torque speed  - Speed where the winch has no torque[rad/s]
 D=0.055 # Diameter of the cylinger collecting the wire [m]
-l0 = 200 # Wirelength, witouth tention [m]
-lf0 =600 # Preforce applied to the wire [N]
+l0 = 200 # Distance between the winch and the pulley. The plane is assumed to start at the same location as the winch [m]
+lf0 =00 # Preforce applied to the wire [N]
+
+phase = 0 #
+"""
+Each phase of the launch determines how the plane should behave:
+    0: Preload the wire. The plane is stationary and the winch starts to tention the wire
+    1: Takeoff. The plane is released and starts to accelerate along the ground
+    2: Liftoff and climb. The plane increases the angle of attack and leaves the ground.
+    3: Dive. At the peak height the plane starts to dive against the pulley to increase its energy
+    4: Climb. The winch is released and the plane starts to climb.
+
+"""
 
 # Some global variables
 cl = 0.0     # Lift Coefficient [-]
 cd = 0.0     # Drag coefficient [-]
-l    = [l0+lf0/k0*l0]       # Length of the line between the winch and the plane [m]
+l    = [2*l0]       # Length of the line between the winch and the plane [m]
 lw    = [0]        # Meters of line on the winch [m]
 lf  = [lf0]    # Lineforce [N]
 k    = k0        # Actual spring force of the line [N/m]
 gamma = gamma0   # Angle between plane and ground [deg]
 psi = 0.0      # Angle between line and ground [deg]
-x   = [-l[0]]      # Positon of the plane in x direction [m]
+x   = [-l[0]/2]      # Positon of the plane in x direction [m]
 y   = [0.0]      # Position of the plane in y direction [m]
 u   = [v0*math.cos(rad(gamma))]      # Plane velocity in x direction [m/s]
 v   = [v0*math.sin(rad(gamma))]      # Plane velocity in y direction [m/s]
@@ -91,7 +102,7 @@ def calcGamma():
     """
 
 
-    return gamma0-psi#deg(math.atan2(v[-1],u[-1]))
+    return gamma0-psi+10#deg(math.atan2(v[-1],u[-1]))
 
 
 
@@ -145,7 +156,7 @@ def lLine():
     """
     Returns the actual length of the line
     """
-    return ((x[-1])**2+y[-1]**2)**0.5
+    return ((x[-1])**2+y[-1]**2)**0.5+l0
 
 def fLine():
     """
@@ -173,12 +184,16 @@ def Euler():
     Calculates the new position of the plane using forward Euler iteration
     Does not allow the plane to go below y=0 as this is ground level
     """
-    fx,fy = sumForces()
-    ax=fx/pm
-    ay=fy/pm
 
-    u.append(u[-1]+ax*dt)
-    v.append(v[-1]+ay*dt)
+    if phase == 0:
+        u.append(0)
+        v.append(0)
+    else:
+        fx,fy = sumForces()
+        ax=fx/pm
+        ay=fy/pm
+        u.append(u[-1]+ax*dt)
+        v.append(v[-1]+ay*dt)
 
     x.append(x[-1]+u[-1]*dt)
     y.append(max(y[-1]+v[-1]*dt,0))
