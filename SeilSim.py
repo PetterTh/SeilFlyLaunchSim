@@ -30,22 +30,21 @@ Some Different E values:
 """
 g  = 9.81    # Gavitational acceleration [m/s2]
 rho = 1.4    # Airdensity [kg/m3]
-v0 = 0        # Launch speed [m/s]
+v0 = 20        # Takeoff speed [m/s]
 gamma0 = 0 # Launch angle
-Tmax = 10    # Maximal simulation time [s]
+Tmax = 150    # Maximal simulation time [s]
 dt  = 0.01    # Time step for the calculation [s]
 wst = 9.8    # Winch Stall torque - Torque at zero speed [Nm]
 wzs = 3800/60*2*np.pi #Winch zero torque speed  - Speed where the winch has no torque[rad/s]
 D=0.055 # Diameter of the cylinger collecting the wire [m]
 l0 = 200 # Distance between the winch and the pulley. The plane is assumed to start at the same location as the winch [m]
-lf0 =00 # Preforce applied to the wire [N]
-
+pf =100 # Preforce applied to the wire [N]
 phase = 0 #
 """
 Each phase of the launch determines how the plane should behave:
     0: Preload the wire. The plane is stationary and the winch starts to tention the wire
-    1: Takeoff. The plane is released and starts to accelerate along the ground
-    2: Liftoff and climb. The plane increases the angle of attack and leaves the ground.
+    1: Takeoff. The plane is released and starts to accelerate along the ground. This phase starts when the line reaches the wanted preforce
+    2: Liftoff and climb. The plane increases the angle of attack and leaves the ground. This phase starts when the takeoffspeed (v0) is reached
     3: Dive. At the peak height the plane starts to dive against the pulley to increase its energy
     4: Climb. The winch is released and the plane starts to climb.
 
@@ -56,7 +55,7 @@ cl = 0.0     # Lift Coefficient [-]
 cd = 0.0     # Drag coefficient [-]
 l    = [2*l0]       # Length of the line between the winch and the plane [m]
 lw    = [0]        # Meters of line on the winch [m]
-lf  = [lf0]    # Lineforce [N]
+lf  = [0]    # Lineforce [N]
 k    = k0        # Actual spring force of the line [N/m]
 gamma = gamma0   # Angle between plane and ground [deg]
 psi = 0.0      # Angle between line and ground [deg]
@@ -100,9 +99,16 @@ def calcGamma():
     Returns the plane angle.
     Assumes the plane flies with gamma0 degrees towards the line all the time
     """
-
-
-    return gamma0-psi+10#deg(math.atan2(v[-1],u[-1]))
+    if phase == 0:
+        return gamma0
+    if phase == 1:
+        return gamma0
+    if phase == 2:
+        return 80-psi
+    if phase == 3:
+        return -psi
+    if phase == 4:
+        return 45
 
 
 
@@ -163,7 +169,10 @@ def fLine():
     Returns the force in the line
     dF=(dL+winchspeed)/k
     """
-    return max(0,lf[-1]+((l[-1]-l[-2])+Swinch())/l[-1]*kLine())
+    if phase == 4:
+        return 0
+    else:
+        return max(0,lf[-1]+((l[-1]-l[-2])+Swinch())/l[-1]*kLine())
 
 
 def sumForces():
@@ -188,6 +197,13 @@ def Euler():
     if phase == 0:
         u.append(0)
         v.append(0)
+    elif phase ==1:
+        fx,fy = sumForces()
+        ax=fx/pm
+        ay=fy/pm
+        u.append(u[-1]+ax*dt)
+        v.append(0)
+
     else:
         fx,fy = sumForces()
         ax=fx/pm
@@ -200,7 +216,7 @@ def Euler():
 
 
 def simulate():
-    global gamma,psi,wf,velAng,attAng,cd,cl
+    global gamma,psi,wf,velAng,attAng,cd,cl,phase
     """
     Runs the simulation
     """
@@ -217,8 +233,21 @@ def simulate():
         Euler()
         T.append(T[-1]+dt)
         #print T[-1],attAng,gamma
-        if x[-1]>0:
+
+        # Change phases
+        if lf[-1]>pf and phase==0:
+            phase = 1
+        if (u[-1]**2+v[-1]**2)**0.5>v0 and phase==1:
+            phase = 2
+        if psi > 75 and phase ==2:
+            phase = 3
+        if (y[-1]<50 or lf[-1]==0) and phase ==3:
+            phase = 4
+
+        if y[-1]<-5:
             break
+
+
 
 
 def plotSim():
