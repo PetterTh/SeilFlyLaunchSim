@@ -1,4 +1,5 @@
 import numpy as np
+from scipy import optimize
 from math import *
 from pylab import *
 
@@ -39,7 +40,7 @@ wzs = 3800/60*2*np.pi #Winch zero torque speed  - Speed where the winch has no t
 D=0.055 # Diameter of the cylinger collecting the wire [m]
 l0 = 200 # Distance between the winch and the pulley. The plane is assumed to start at the same location as the winch [m]
 pf =100 # Preforce applied to the wire [N]
-gammaR = 180 # Rate of gamma change [deg/s]. A maximal value of which the gamma can change per second. Used to limit the turn rate
+gammaR = 270 # Rate of gamma change [deg/s]. A maximal value of which the gamma can change per second. Used to limit the turn rate
 phase = 0 #
 """
 Each phase of the launch determines how the plane should behave:
@@ -50,25 +51,36 @@ Each phase of the launch determines how the plane should behave:
     4: Climb. The winch is released and the plane starts to climb.
 
 """
-
 # Some global variables
 cl = 0.0     # Lift Coefficient [-]
 cd = 0.0     # Drag coefficient [-]
-l    = [2*l0]       # Length of the line between the winch and the plane [m]
-lw    = [0]        # Meters of line on the winch [m]
-lf  = [0]    # Lineforce [N]
-k    = k0        # Actual spring force of the line [N/m]
-gamma = [gamma0]   # Angle between plane and ground [deg]
-psi = 0.0      # Angle between line and ground [deg]
-x   = [-l[0]/2]      # Positon of the plane in x direction [m]
-y   = [0.0]      # Position of the plane in y direction [m]
-u   = [0]      # Plane velocity in x direction [m/s]
-v   = [0]      # Plane velocity in y direction [m/s]
-T  = [0.0]     # Accumulated time [s]
-attAng = [0] # Angle of attack [deg]
-velAng = [gamma0] # The planes velocity angle [deg]
-omega = [0]    # Speed of the winch [rad/s]
-E = [0] # Total energy of the plane [J]
+
+
+def reset():
+    """
+    Resets all neccecary variables
+    """
+    global l,lw,lf,k,lf,gamma,psi,x,y,u,v,T,attAng,velAng,omega,E,phase
+
+    # Some global variables
+    l    = [2*l0]       # Length of the line between the winch and the plane [m]
+    lw    = [0]        # Meters of line on the winch [m]
+    lf  = [0]    # Lineforce [N]
+    k    = k0        # Actual spring force of the line [N/m]
+    gamma = [gamma0]   # Angle between plane and ground [deg]
+    psi = 0.0      # Angle between line and ground [deg]
+    x   = [-l[0]/2]      # Positon of the plane in x direction [m]
+    y   = [0.0]      # Position of the plane in y direction [m]
+    u   = [0]      # Plane velocity in x direction [m/s]
+    v   = [0]      # Plane velocity in y direction [m/s]
+    T  = [0.0]     # Accumulated time [s]
+    attAng = [0] # Angle of attack [deg]
+    velAng = [gamma0] # The planes velocity angle [deg]
+    omega = [0]    # Speed of the winch [rad/s]
+    E = [0] # Total energy of the plane [J]
+    phase = 0
+
+
 
 def calcCd():
     """
@@ -106,11 +118,11 @@ def calcGamma():
     if phase == 1:
         goal=gamma0
     if phase == 2:
-        goal=80-psi
+        goal=85-psi
     if phase == 3:
        goal= -psi
     if phase == 4:
-        goal=45
+        goal=70
     if goal < gamma[-1]:
         return max(goal,gamma[-1]-gammaR*dt)
     elif goal > gamma[-1]:
@@ -223,11 +235,12 @@ def Euler():
     y.append(max(y[-1]+v[-1]*dt,0))
 
 
-def simulate():
-    global gamma,psi,wf,velAng,attAng,cd,cl,phase
+def simulate(inp):
+    global gamma,psi,wf,velAng,attAng,cd,cl,phase,pf,v0
     """
     Runs the simulation
     """
+    reset()
     while T[-1]<=Tmax and y[-1] >= -10.0:
 
         psi = calcPsi()
@@ -246,19 +259,22 @@ def simulate():
         # Change phases
         if lf[-1]>pf and phase==0:
             phase = 1
-            print "Phase 1: T:",T[-1],"X:",x[-1]
+            #print "Phase 1: T:",T[-1],"X:",x[-1]
         if (u[-1]**2+v[-1]**2)**0.5>v0 and phase==1:
             phase = 2
-            print "Phase 2: T:",T[-1],"X:",x[-1]
-        if psi > 85 and phase ==2:
+            #print "Phase 2: T:",T[-1],"X:",x[-1]
+        if psi > 80 and phase ==2:
             phase = 3
-            print "Phase 3: T:",T[-1],"X:",x[-1]
+            #print "Phase 3: T:",T[-1],"X:",x[-1]
         if (y[-1]<50 or lf[-1]==0) and phase ==3:
             phase = 4
-            print "Phase 4: T:",T[-1],"X:",x[-1]
+            #print "Phase 4: T:",T[-1],"X:",x[-1]
 
-        if y[-1]<-5:
-            break
+    print pf,max(E)
+    if max(E)==0:
+        return 1000
+    else:
+        return 1/max(E)
 
 
 
@@ -288,6 +304,9 @@ def plotSim():
 
 
 if __name__=="__main__":
-    simulate()
+    #lim = ([0,300],[0,50])
+    #res=optimize.brute(simulate,lim,Ns=4)
+    simulate([0])
     print "Hmax: ",max(y),"EnergyMax: ",max(E)
     plotSim()
+
