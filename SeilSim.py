@@ -142,21 +142,21 @@ def reset():
     k    = k0          # Actual spring force of the line [N/m]
     gamma = [gamma0]   # Angle between plane and ground [deg]
     psi = 0.0          # Angle between line and ground [deg]
-    
+
     x   = [-l[0]/2]    # Positon of the plane in x direction [m]
     y   = [0.0]        # Position of the plane in y direction [m]
-    
+
     if alt ==1:
         gammaDesiredAngle = gammaDesiredAngle0 # Launch angle init
         u   = [0]      # Plane velocity in x direction [m/s]
         v   = [0]      # Plane velocity in y direction [m/s]
-       
+
     if alt == 2:
         gammaDesiredAngle = gamma0 # Launch angle init
         u   = [np.cos(rad(gammaDesiredAngle))*v0]      # Plane velocity in x direction [m/s]
         v   = [np.sin(rad(gammaDesiredAngle))*v0]      # Plane velocity in y direction [m/s]
-        
-        
+
+
     velocity = [0]     # Plane total velocity
     T  = [0.0]         # Accumulated time [s]
     attAng = [0]       # Angle of attack [deg]
@@ -175,7 +175,7 @@ def calcCd():
         cd0 =cd0_2
     else:
         cd0 = cd0_3
-        
+
     return cl**2/AR + cd0
 
 def calcCl():
@@ -210,8 +210,8 @@ def calcGamma():
         gammaMyR = gammaR3 # Does not work!!!!!!!
     else:
         gammaMyR = gammaR4 # radius of bottom of zoom
-            
-    
+
+
     goal = 0
     if phase == 0:
         goal=gamma0
@@ -224,7 +224,7 @@ def calcGamma():
     if phase == 4:
         goal=climbAngle
     if goal < gamma[-1]:
-        
+
         return max(goal,gamma[-1]-gammaMyR*dt)
     elif goal > gamma[-1]:
         return min(goal,gamma[-1]+gammaMyR*dt)
@@ -243,11 +243,11 @@ def calcPsi():
 
 def gammaDesired():
     global integral,gammaDesiredAngle,previous_error
-    
+
     error = setpointAOA-calcAttAng()
     integral = integral + (error*dt)
     derivative = (error - previous_error)/dt
-    
+
     gammaDesiredAngle =  gammaDesiredAngle+( Kp*error+ Ki*integral + Kd*derivative)
 
     previous_error = error
@@ -255,8 +255,8 @@ def gammaDesired():
         gammaDesiredAngle = 90
     if gammaDesiredAngle<75:
         gammaDesiredAngle = 75
-            
-            
+
+
     print "gammaDesiredAngle: ",gammaDesiredAngle
     return gammaDesiredAngle
 
@@ -284,9 +284,9 @@ def diameter():
         drumDiameter = drumDiameter+lineDiameter
 
     return drumDiameter
-        
-    
-    
+
+
+
 def Swinch():
     """
     Returns the length of wire which the winch collects during 1 dt
@@ -330,7 +330,7 @@ def sumForces():
     returns the fx and fy
     """
     vel = sqrt(np.power(u[-1],2)+np.power(v[-1],2))
-   
+
 
     fx=-Fdrag(vel)*np.cos(rad(velAng[-1]))+lf[-1]*np.cos(rad(psi))-Flift(vel)*np.sin(rad(velAng[-1]))
     fy=-Fdrag(vel)*np.sin(rad(velAng[-1]))-lf[-1]*np.sin(rad(psi))+Flift(vel)*np.cos(rad(velAng[-1]))-g*pm
@@ -366,7 +366,7 @@ def Euler():
 
 
 
-    
+
 def simulate(inp):
     global gamma,psi,wf,velAng,attAng,cd,cl,phase,pf,v0,vMIn
     """
@@ -386,7 +386,7 @@ def simulate(inp):
         Euler()
         T.append(T[-1]+dt)
         E.append(y[-1]*g*pm+0.5*pm*(u[-1]**2+v[-1]**2))
-        velocity.append([(u[-1]**2+v[-1]**2)**0.5])
+        velocity.append((u[-1]**2+v[-1]**2)**0.5)
         #print T[-1],attAng,gamma
 
         # Change phases
