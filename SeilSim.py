@@ -68,8 +68,8 @@ setpointAOA = 8         # AOA during climb phase
 integral  = 0           # used for the I controller
 previous_error = 0
 gammaDesiredAngle0 = 80  # init for the climbangle
-Kp = 1.5
-Ki = 0.0
+Kp = 1
+Ki = 0.1
 Kd = 0.0
 """
 ******** LAUNCHCONFIGURATION IN PHASE 3*****************************
@@ -99,7 +99,7 @@ finalHeight = 0
 g  = 9.81               # Gavitational acceleration [m/s2]
 rho = 1.4               # Airdensity [kg/m3]
 Tmax = 50               # Maximal simulation time [s]
-dt  = 0.005              # Time step for the calculation [s]
+dt  = 0.01              # Time step for the calculation [s]
 phase = 0               # initial phase
 """
 Each phase of the launch determines how the plane should behave:
@@ -201,6 +201,8 @@ def calcAttAng():
     """
     Returns the angle of attack for the plane
     """
+    if u[-1]==0 and v[-1]==0: # If the plane is stationary the attack angle should be zero
+        return 0
     return gamma[-1]-velAng[-1]
 
 def calcGamma():
@@ -208,7 +210,7 @@ def calcGamma():
     Returns the plane angle.
     Assumes the plane flies with gamma0 degrees towards the line all the time
     """
-    if phase <3:
+    if phase <=3:
         gammaMyR = gammaR3 # Does not work!!!!!!!
     else:
         gammaMyR = gammaR4 # radius of bottom of zoom
@@ -216,7 +218,10 @@ def calcGamma():
 
     goal = 0
     if phase == 0:
-        goal=gamma0
+        if alt==2:
+            goal=gamma0+setpointAOA # Included to simplify things for the governor
+        else:
+            goal=gamma0
     if phase == 1:
         goal=gamma0
     if phase == 2:
@@ -249,7 +254,6 @@ def gammaDesired():
     error = setpointAOA-calcAttAng()
     integral = integral + (error*dt)
     derivative = (error - previous_error)/dt
-
     gammaDesiredAngle =  gammaDesiredAngle+( Kp*error+ Ki*integral + Kd*derivative)
 
     previous_error = error
@@ -377,8 +381,8 @@ def simulate(inp):
     while T[-1]<=Tmax and y[-1] >= -10.0 and phase<5:
 
         psi = calcPsi()
-        gamma.append(calcGamma())
         velAng.append(calcVelAng())
+        gamma.append(calcGamma())
         attAng.append(calcAttAng())
         cl=calcCl()
         cd=calcCd()
