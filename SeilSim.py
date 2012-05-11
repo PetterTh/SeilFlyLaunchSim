@@ -69,8 +69,8 @@ integral  = 0           # used for the I controller
 previous_error = 0
 gammaDesiredAngle0 = 80  # init for the climbangle
 Kp = 1.5
-Ki = 0
-Kd = 0
+Ki = 0.0
+Kd = 0.0
 """
 ******** LAUNCHCONFIGURATION IN PHASE 3*****************************
 """
@@ -99,7 +99,7 @@ finalHeight = 0
 g  = 9.81               # Gavitational acceleration [m/s2]
 rho = 1.4               # Airdensity [kg/m3]
 Tmax = 50               # Maximal simulation time [s]
-dt  = 0.01              # Time step for the calculation [s]
+dt  = 0.005              # Time step for the calculation [s]
 phase = 0               # initial phase
 """
 Each phase of the launch determines how the plane should behave:
@@ -133,7 +133,7 @@ def reset():
     """
     Resets all neccecary variables
     """
-    global l,lw,lf,k,lf,gamma,psi,x,y,u,v,T,attAng,velAng,omega,E,phase, velocity,gammaDesiredAngle
+    global l,lw,lf,k,lf,gamma,psi,x,y,u,v,T,attAng,velAng,omega,E,phase, velocity,gammaDesiredAngle,integral
 
     # Some global variables
     l    = [2*l0]      # Length of the line between the winch and the plane [m]
@@ -148,15 +148,16 @@ def reset():
 
     if alt ==1:
         gammaDesiredAngle = gammaDesiredAngle0 # Launch angle init
-        u   = [0]      # Plane velocity in x direction [m/s]
-        v   = [0]      # Plane velocity in y direction [m/s]
+
+
 
     if alt == 2:
         gammaDesiredAngle = gamma0 # Launch angle init
-        u   = [np.cos(rad(gammaDesiredAngle))*v0]      # Plane velocity in x direction [m/s]
-        v   = [np.sin(rad(gammaDesiredAngle))*v0]      # Plane velocity in y direction [m/s]
 
 
+
+    u   = [0]      # Plane velocity in x direction [m/s]
+    v   = [0]      # Plane velocity in y direction [m/s]
     velocity = [0]     # Plane total velocity
     T  = [0.0]         # Accumulated time [s]
     attAng = [0]       # Angle of attack [deg]
@@ -164,6 +165,7 @@ def reset():
     omega = [0]        # Speed of the winch [rad/s]
     E = [0]            # Total energy of the plane [J]
     phase = 0
+    integral = 0
 
 
 
@@ -251,13 +253,12 @@ def gammaDesired():
     gammaDesiredAngle =  gammaDesiredAngle+( Kp*error+ Ki*integral + Kd*derivative)
 
     previous_error = error
-    if gammaDesiredAngle>90:
-        gammaDesiredAngle = 90
-    if gammaDesiredAngle<75:
-        gammaDesiredAngle = 75
+    #if gammaDesiredAngle>90:
+    #    gammaDesiredAngle = 90
+    #if gammaDesiredAngle<75:
+    #    gammaDesiredAngle = 75
 
-
-    print "gammaDesiredAngle: ",gammaDesiredAngle
+    #print "gammaDesiredAngle: ",gammaDesiredAngle
     return gammaDesiredAngle
 
 def Flift(vel):
@@ -391,7 +392,12 @@ def simulate(inp):
 
         # Change phases
         if lf[-1]>pf and phase==0:
-            phase = 1
+            if alt==2: # Alt 2 does not contain any takeoff along the ground
+                phase=2
+                u[-1]   = np.cos(rad(gammaDesiredAngle))*v0      # Plane velocity in x direction [m/s]
+                v[-1]   = np.sin(rad(gammaDesiredAngle))*v0      # Plane velocity in y direction [m/s]
+            else:
+                phase = 1
             #print "Phase 1: T:",T[-1],"X:",x[-1]
         if (u[-1]**2+v[-1]**2)**0.5>v0 and phase==1:
             phase = 2
@@ -436,7 +442,7 @@ def plotSim():
     ylabel("Angle of attack [deg]")
 
     subplot(2,2,3)
-    plot(T,E)
+    plot(x,velocity)
     xlabel("X-Position [m]")
     ylabel("Velocity")
     show()
