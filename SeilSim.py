@@ -5,8 +5,9 @@ from pylab import *
 
 
 
-
+"""
 # Some global parameters
+"""
 alt = 2
 """
     1: all phase flown
