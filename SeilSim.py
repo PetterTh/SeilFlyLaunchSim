@@ -79,9 +79,9 @@ cd0_2 = 0.003
 setpointAOA = 8         # AOA during climb phase
 integral  = 0           # used for the I controller
 previous_error = 0
-gammaDesiredAngle0 = 100  # init for the climbangle
-Kp = 1.1
-Ki = 0
+gammaDesiredAngle0 = 80  # init for the climbangle
+Kp = 1.0
+Ki = 0.1
 Kd = 0
 """
 ******** LAUNCHCONFIGURATION IN PHASE 3*****************************
@@ -190,7 +190,7 @@ def calcCd():
     else:
         cd0 = cd0_3
 
-        cli = cdInduced(cl,AR)
+    cli = cdInduced(cl,AR)
     return cli + cd0
 
 def clO(flapPos):
@@ -212,12 +212,12 @@ def clAlpha():
     x2 = 3.3
     return (y2-y1)/(x2-x1)*180/np.pi
 def clCD():
-    cl[0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 ]
-    cdp_n5_Re150000 = [.0127 .0113 .0108 .0108 .0107 0.0106 .0113 .0123 .0153 .0215 .0320]
-    cdp_n0_Re200000 = [.0113 0.0098 .0088 .0085 .0084  .0088 .0098 .0115 .0145  .0185 .00265]
-    cdp_n_25_Re300000 = [.0098 0.0078 .0073 .0078 0.0090 .0113 0.0170 0.0220]
+    cl=[0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0 ]
+    cdp_n5_Re150000 = [.0127,.0113,.0108,.0108,.0107,0.0106,.0113,.0123,.0153,.0215,.0320]
+    #cdp_n0_Re200000 = [.0113 0.0098 .0088 .0085 .0084  .0088 .0098 .0115 .0145  .0185 .00265]
+    #cdp_n_25_Re300000 = [.0098 0.0078 .0073 .0078 0.0090 .0113 0.0170 0.0220]
 
-    # ved 5deg flap cwTot~0.049 ved 0 deg 0.031 
+    # ved 5deg flap cwTot~0.049 ved 0 deg 0.031
     return 3
 
 def calcCl():
@@ -234,7 +234,7 @@ def cdInterference(Re):
     return 0.01*(150000/Re)^.5
 
 def cdInduced(cl,AR):
-    return cl^2/np.pi/AR
+    return cl**2/np.pi/AR
 
 def calcVelAng():
     """
@@ -462,7 +462,7 @@ def simulate(inp):
             heightPhase.append(y[-1])
             counterPhase.append(teller)
             #print "Phase 3: T:",T[-1],"X:",x[-1]
-            
+
         if (y[-1]<50 or lf[-1]==0) and phase ==3:
             phase = 4
             heightPhase.append(y[-1])
@@ -480,13 +480,13 @@ def simulate(inp):
     for index, item in enumerate(heightPhase):
         print "Phase ",index, "Height :",item
 
-        
+
     print "Pre tension:",pf,"Max energy:",max(E)
 
     print "cl0:" , clO(0)
     print "clAlpha:", clAlpha()
     print "kim"
-    
+
     if max(E)==0:
         return 1000
     else:
@@ -511,7 +511,8 @@ def plotSim():
     ylabel("Force in wire [N]")
 
     subplot(2,2,4)
-    plot(x[counterPhase[2]:counterPhase[3]],attAng[counterPhase[2]:counterPhase[3]])
+    #plot(x[counterPhase[2]:counterPhase[3]],attAng[counterPhase[2]:counterPhase[3]])
+    plot(x,attAng)
     xlabel("X-Position [m]")
     ylabel("Angle of attack [deg]")
 
@@ -535,5 +536,5 @@ if __name__=="__main__":
     #res=optimize.brute(simulate,lim,Ns=4)
     simulate([0])
     plotSim()
-    
+
 
