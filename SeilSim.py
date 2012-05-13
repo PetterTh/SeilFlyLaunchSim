@@ -139,7 +139,7 @@ def reset():
     """
     Resets all neccecary variables
     """
-    global l,lw,lf,k,lf,gamma,psi,x,y,u,v,T,attAng,velAng,omega,E,phase, velocity,gammaDesiredAngle,heightPhase
+    global l,lw,lf,k,lf,gamma,psi,x,y,u,v,T,attAng,velAng,omega,E,phase, velocity,gammaDesiredAngle,heightPhase,integral
 
     # Some global variables
     l    = [2*l0]      # Length of the line between the winch and the plane [m]
