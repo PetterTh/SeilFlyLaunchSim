@@ -51,6 +51,17 @@ windSpeed = 3       # The headwind meassured at 2 meters height, m/s
 thermic = 5         # The thermic upwind speed component, m/s
 thermicCeil = 600   # where the thermic wind ceils, or where it is known, its intrepated linear up to this height
 
+
+"""
+Each phase of the launch determines how the plane should behave:
+    0: Preload the wire. The plane is stationary and the winch starts to tention the wire
+    1: Takeoff. The plane is released and starts to accelerate along the ground. This phase starts when the line reaches the wanted preforce
+    2: Liftoff and climb. The plane increases the angle of attack and leaves the ground. This phase starts when the takeoffspeed (v0) is reached
+    3: Dive. At the peak height the plane starts to dive against the pulley to increase its energy
+    4: Climb. The winch is released and the plane starts to climb.
+
+"""
+
 """
 ******** LAUNCHCONFIGURATION IN PHASE 0*****************************
 """
@@ -59,7 +70,7 @@ pf =100                 # Preforce applied to the wire [N]
 ******** LAUNCHCONFIGURATION IN PHASE 1, in alt2 mode used as init...
 """
 v0 = 10                 # Takeoff speed [m/s]
-gamma0 = 75             # Launch angle
+gamma0 = 70             # Launch angle
 """
 ******** LAUNCHCONFIGURATION IN PHASE 2*****************************
 """
@@ -68,10 +79,10 @@ cd0_2 = 0.003
 setpointAOA = 8         # AOA during climb phase
 integral  = 0           # used for the I controller
 previous_error = 0
-gammaDesiredAngle0 = 80  # init for the climbangle
-Kp = 1
-Ki = 0.1
-Kd = 0.0
+gammaDesiredAngle0 = 100  # init for the climbangle
+Kp = 1.1
+Ki = 0
+Kd = 0
 """
 ******** LAUNCHCONFIGURATION IN PHASE 3*****************************
 """
@@ -102,18 +113,12 @@ rho = 1.4               # Airdensity [kg/m3]
 Tmax = 50               # Maximal simulation time [s]
 dt  = 0.01              # Time step for the calculation [s]
 phase = 0               # initial phase
-"""
-Each phase of the launch determines how the plane should behave:
-    0: Preload the wire. The plane is stationary and the winch starts to tention the wire
-    1: Takeoff. The plane is released and starts to accelerate along the ground. This phase starts when the line reaches the wanted preforce
-    2: Liftoff and climb. The plane increases the angle of attack and leaves the ground. This phase starts when the takeoffspeed (v0) is reached
-    3: Dive. At the peak height the plane starts to dive against the pulley to increase its energy
-    4: Climb. The winch is released and the plane starts to climb.
 
-"""
 # Some global variables
 cl = 0.0     # Lift Coefficient [-]
 cd = 0.0     # Drag coefficient [-]
+heightPhase = [0]
+counterPhase =[0]
 
 
 def deg(a):
@@ -134,7 +139,7 @@ def reset():
     """
     Resets all neccecary variables
     """
-    global l,lw,lf,k,lf,gamma,psi,x,y,u,v,T,attAng,velAng,omega,E,phase, velocity,gammaDesiredAngle,integral
+    global l,lw,lf,k,lf,gamma,psi,x,y,u,v,T,attAng,velAng,omega,E,phase, velocity,gammaDesiredAngle,heightPhase
 
     # Some global variables
     l    = [2*l0]      # Length of the line between the winch and the plane [m]
@@ -168,6 +173,12 @@ def reset():
     phase = 0
     integral = 0
 
+    """
+    Here we add some logging features ...
+    """
+    heightPhase[phase] = y[-1]
+    counterPhase[phase]= 0
+
 
 
 def calcCd():
@@ -179,7 +190,35 @@ def calcCd():
     else:
         cd0 = cd0_3
 
-    return cl**2/AR + cd0
+        cli = cdInduced(cl,AR)
+    return cli + cd0
+
+def clO(flapPos):
+    #-2.5 0.111 stall occurs at 10deg
+    #10 0.9 stall occurs at 5deg
+    y1 = 0.111
+    x1 = -2.5
+    y2 = 0.9
+    x2 = 10
+    return (y2-y1)/(x2-x1)*(flapPos-x1)+y1
+
+def clAlpha():
+    #0deg 0.278
+    #3.5deg 0.615
+
+    y1 = 0.278
+    x1 = 0
+    y2 = 0.615
+    x2 = 3.3
+    return (y2-y1)/(x2-x1)*180/np.pi
+def clCD():
+    cl[0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 ]
+    cdp_n5_Re150000 = [.0127 .0113 .0108 .0108 .0107 0.0106 .0113 .0123 .0153 .0215 .0320]
+    cdp_n0_Re200000 = [.0113 0.0098 .0088 .0085 .0084  .0088 .0098 .0115 .0145  .0185 .00265]
+    cdp_n_25_Re300000 = [.0098 0.0078 .0073 .0078 0.0090 .0113 0.0170 0.0220]
+
+    # ved 5deg flap cwTot~0.049 ved 0 deg 0.031 
+    return 3
 
 def calcCl():
     """
@@ -190,6 +229,12 @@ def calcCl():
     else:
         cl0 = cl0_3
     return 2*np.pi*rad(attAng[-1])+cl0
+
+def cdInterference(Re):
+    return 0.01*(150000/Re)^.5
+
+def cdInduced(cl,AR):
+    return cl^2/np.pi/AR
 
 def calcVelAng():
     """
@@ -255,7 +300,7 @@ def gammaDesired():
     error = setpointAOA-calcAttAng()
     integral = integral + (error*dt)
     derivative = (error - previous_error)/dt
-    gammaDesiredAngle =  gammaDesiredAngle+( Kp*error+ Ki*integral + Kd*derivative)
+    gammaDesiredAngle =  gammaDesiredAngle +( Kp*error+ Ki*integral + Kd*derivative)
 
     previous_error = error
     #if gammaDesiredAngle>90:
@@ -374,11 +419,12 @@ def Euler():
 
 
 def simulate(inp):
-    global gamma,psi,wf,velAng,attAng,cd,cl,phase,pf,v0,vMIn
+    global gamma,psi,wf,velAng,attAng,cd,cl,phase,pf,v0,vMin,heightPhase,counterPhase
     """
     Runs the simulation
     """
     reset()
+    teller = 0
     while T[-1]<=Tmax and y[-1] >= -10.0 and phase<5:
 
         psi = calcPsi()
@@ -403,21 +449,44 @@ def simulate(inp):
                 v[-1]   = np.sin(rad(gammaDesiredAngle))*v0      # Plane velocity in y direction [m/s]
             else:
                 phase = 1
+            heightPhase.append(y[-1])
+            counterPhase.append(teller)
             #print "Phase 1: T:",T[-1],"X:",x[-1]
         if (u[-1]**2+v[-1]**2)**0.5>v0 and phase==1:
             phase = 2
+            heightPhase.append(y[-1])
+            counterPhase.append(teller)
             #print "Phase 2: T:",T[-1],"X:",x[-1]
         if psi > diveStartAngle and phase ==2:
             phase = 3
+            heightPhase.append(y[-1])
+            counterPhase.append(teller)
             #print "Phase 3: T:",T[-1],"X:",x[-1]
+            
         if (y[-1]<50 or lf[-1]==0) and phase ==3:
             phase = 4
+            heightPhase.append(y[-1])
+            counterPhase.append(teller)
             #print "Phase 4: T:",T[-1],"X:",x[-1]
 
         if (u[-1]**2+v[-1]**2)**0.5<vMin and phase>3:
             phase = 5
+            heightPhase.append(y[-1])
+            counterPhase.append(teller)
 
-    print pf,max(E)
+        teller=teller + 1
+
+
+    for index, item in enumerate(heightPhase):
+        print "Phase ",index, "Height :",item
+
+        
+    print "Pre tension:",pf,"Max energy:",max(E)
+
+    print "cl0:" , clO(0)
+    print "clAlpha:", clAlpha()
+    print "kim"
+    
     if max(E)==0:
         return 1000
     else:
@@ -442,8 +511,8 @@ def plotSim():
     ylabel("Force in wire [N]")
 
     subplot(2,2,4)
-    plot(T,attAng)
-    xlabel("Time [s]")
+    plot(x[counterPhase[2]:counterPhase[3]],attAng[counterPhase[2]:counterPhase[3]])
+    xlabel("X-Position [m]")
     ylabel("Angle of attack [deg]")
 
     subplot(2,2,3)
@@ -460,10 +529,11 @@ def plotSim():
     show()
 
 
+
 if __name__=="__main__":
     #lim = ([0,300],[0,50])
     #res=optimize.brute(simulate,lim,Ns=4)
     simulate([0])
-    print "Hmax: ",max(y),"EnergyMax: ",max(E)
     plotSim()
+    
 
