@@ -2,7 +2,8 @@ import numpy as np
 from scipy import optimize
 from math import *
 from pylab import *
-
+from LnD import *
+from selFunc import *
 
 
 """
@@ -120,21 +121,6 @@ cd = 0.0     # Drag coefficient [-]
 heightPhase = [0]
 counterPhase =[0]
 
-
-def deg(a):
-    """
-    Returns the argument in degrees
-    """
-
-    return float(a)*180/np.pi
-
-def rad(a):
-    """
-    Returns the argument in radians
-    """
-
-    return float(a)/180*np.pi
-
 def reset():
     """
     Resets all neccecary variables
@@ -180,61 +166,25 @@ def reset():
     counterPhase[phase]= 0
 
 
-
-def calcCd():
+def Flift(vel):
     """
-    Returns the drag coefficient
+    Returns the lift force of the plane based on the input velocity
+    Flift = cl*v^2*rho/2*A
     """
-    if phase <3:
-        cd0 =cd0_2
-    else:
-        cd0 = cd0_3
 
-    cli = cdInduced(cl,AR)
-    return cli + cd0
+    return cl*vel**2*rho/2*A
 
-def clO(flapPos):
-    #-2.5 0.111 stall occurs at 10deg
-    #10 0.9 stall occurs at 5deg
-    y1 = 0.111
-    x1 = -2.5
-    y2 = 0.9
-    x2 = 10
-    return (y2-y1)/(x2-x1)*(flapPos-x1)+y1
 
-def clAlpha():
-    #0deg 0.278
-    #3.5deg 0.615
-
-    y1 = 0.278
-    x1 = 0
-    y2 = 0.615
-    x2 = 3.3
-    return (y2-y1)/(x2-x1)*180/np.pi
-def clCD():
-    cl=[0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0 ]
-    cdp_n5_Re150000 = [.0127,.0113,.0108,.0108,.0107,0.0106,.0113,.0123,.0153,.0215,.0320]
-    #cdp_n0_Re200000 = [.0113 0.0098 .0088 .0085 .0084  .0088 .0098 .0115 .0145  .0185 .00265]
-    #cdp_n_25_Re300000 = [.0098 0.0078 .0073 .0078 0.0090 .0113 0.0170 0.0220]
-
-    # ved 5deg flap cwTot~0.049 ved 0 deg 0.031
-    return 3
-
-def calcCl():
+def Fdrag(vel):
     """
-    Returns the lift coefficient
+    Returns the grad force of the plane based on the input velocity
+    Flift = cd*v^2*rho/2*A
     """
-    if phase <3:
-        cl0 =cl0_2
-    else:
-        cl0 = cl0_3
-    return 2*np.pi*rad(attAng[-1])+cl0
 
-def cdInterference(Re):
-    return 0.01*(150000/Re)^.5
+    return cd*vel**2*rho/2*A
 
-def cdInduced(cl,AR):
-    return cl**2/np.pi/AR
+
+
 
 def calcVelAng():
     """
@@ -311,22 +261,7 @@ def gammaDesired():
     #print "gammaDesiredAngle: ",gammaDesiredAngle
     return gammaDesiredAngle
 
-def Flift(vel):
-    """
-    Returns the lift force of the plane based on the input velocity
-    Flift = cl*v^2*rho/2*A
-    """
 
-    return cl*vel**2*rho/2*A
-
-
-def Fdrag(vel):
-    """
-    Returns the grad force of the plane based on the input velocity
-    Flift = cd*v^2*rho/2*A
-    """
-
-    return cd*vel**2*rho/2*A
 
 def diameter():
     global drumDiameter,layersOnDrum
@@ -431,8 +366,8 @@ def simulate(inp):
         velAng.append(calcVelAng())
         gamma.append(calcGamma())
         attAng.append(calcAttAng())
-        cl=calcCl()
-        cd=calcCd()
+        cl=calcCl(phase,cl0_2,cl0_3,attAng[-1])
+        cd=calcCd(phase,cd0_2,cd0_3,cl,AR)
         l.append(lLine())
         lf.append(fLine())
         Euler()
