@@ -12,6 +12,7 @@ alt = 2
     1: all phase flown
     2: thrown in the air
     3: no zooming
+    4: taking out all the energy of line
 """
 """
 ********* PLANE PARAMETERS *******************************
@@ -46,7 +47,7 @@ Some Different E values:
 Not implemented yet
 """
 
-windSpeed = 3       # The headwind meassured at 2 meters height, m/s
+windSpeed = 10       # The headwind meassured at 2 meters height, m/s
 thermic = 5         # The thermic upwind speed component, m/s
 thermicCeil = 600   # where the thermic wind ceils, or where it is known, its intrepated linear up to this height
 
@@ -64,7 +65,7 @@ Each phase of the launch determines how the plane should behave:
 """
 ******** LAUNCHCONFIGURATION IN PHASE 0*****************************
 """
-pf =100                 # Preforce applied to the wire [N]
+pf = 350                 # Preforce applied to the wire [N]
 """
 ******** LAUNCHCONFIGURATION IN PHASE 1, in alt2 mode used as init...
 """
@@ -82,6 +83,7 @@ gammaDesiredAngle0 = 100  # init for the climbangle
 Kp = 1.1
 Ki = 0
 Kd = 0
+flapPosPhase2 = 10
 """
 ******** LAUNCHCONFIGURATION IN PHASE 3*****************************
 """
@@ -89,20 +91,22 @@ gammaR3 = 200 # Rate of gamma change [deg/s]. A maximal value of which the gamma
 diveStartAngle = 75
 cl0_3 = 0.05
 cd0_3 = 0.002
+flapPosPhase3 = -2.5
 """
 ******** LAUNCHCONFIGURATION IN PHASE 4*****************************
 """
 gammaR4 = 600 # Rate of gamma change [deg/s]. A maximal value of which the gamma can change per second. Used to limit the turn rate
+flapPosR4 = 0
 climbAngle = 75
-cl0_4 = 0.05
 cd0_4 = 0.002
+flapPosPhase5 = -2.5
 
 """
 ******** LAUNCHCONFIGURATION IN PHASE 5*****************************
 """
 vMin = 9
 gammaR5 = 200 # Rate of gamma change [deg/s]. A maximal value of which the gamma can change per second. Used to limit the turn rate
-finalHeight = 0
+flapPosPhase5 = 5
 
 """
 *********** STANDARD CONFIGURATION *********************************
@@ -110,7 +114,7 @@ finalHeight = 0
 g  = 9.81               # Gavitational acceleration [m/s2]
 rho = 1.4               # Airdensity [kg/m3]
 Tmax = 50               # Maximal simulation time [s]
-dt  = 0.01              # Time step for the calculation [s]
+dt  = 0.005              # Time step for the calculation [s]
 phase = 0               # initial phase
 
 # Some global variables
@@ -138,7 +142,8 @@ def reset():
     """
     Resets all neccecary variables
     """
-    global l,lw,lf,k,lf,gamma,psi,x,y,u,v,T,attAng,velAng,omega,E,phase, velocity,gammaDesiredAngle,heightPhase
+    global l,lw,lf,k,lf,gamma,psi,x,y,u,v,T,attAng,velAng,omega,E,phase, velocity,gammaDesiredAngle
+    global heightPhase,integral,psiAng,cdiVal,loadFactor,cdVal,clVal,flapPos
 
     # Some global variables
     l    = [2*l0]      # Length of the line between the winch and the plane [m]
@@ -147,20 +152,19 @@ def reset():
     k    = k0          # Actual spring force of the line [N/m]
     gamma = [gamma0]   # Angle between plane and ground [deg]
     psi = 0.0          # Angle between line and ground [deg]
+    psiAng = [0]       # Angle between line and ground [deg]
     
     x   = [-l[0]/2]    # Positon of the plane in x direction [m]
     y   = [0.0]        # Position of the plane in y direction [m]
     
     if alt ==1:
         gammaDesiredAngle = gammaDesiredAngle0 # Launch angle init
-        u   = [0]      # Plane velocity in x direction [m/s]
-        v   = [0]      # Plane velocity in y direction [m/s]
-       
+        
     if alt == 2:
         gammaDesiredAngle = gamma0 # Launch angle init
-        u   = [np.cos(rad(gammaDesiredAngle))*v0]      # Plane velocity in x direction [m/s]
-        v   = [np.sin(rad(gammaDesiredAngle))*v0]      # Plane velocity in y direction [m/s]
-        
+    
+    u   = [0]      # Plane velocity in x direction [m/s]
+    v   = [0]      # Plane velocity in y direction [m/s]    
         
     velocity = [0]     # Plane total velocity
     T  = [0.0]         # Accumulated time [s]
@@ -169,7 +173,16 @@ def reset():
     omega = [0]        # Speed of the winch [rad/s]
     E = [0]            # Total energy of the plane [J]
     phase = 0
+    integral = 0
 
+    flapPos = flapPosPhase2
+
+    cdiVal = [0] #induced drag coefficient
+    clVal  = [0] #lift coeffcient
+    cdVal = [0] #drag coefficient
+    loadFactor = [0] # loadfactor
+
+    
     """
     Here we add some logging features ...
     """
@@ -182,15 +195,16 @@ def calcCd():
     """
     Returns the drag coefficient
     """
-    if phase <3:
+    if phase <=3:
         cd0 =cd0_2
     else:
         cd0 = cd0_3
 
-        cli = cdInduced(cl,AR)
+    cli = cdInduced()
+    cd0 = 0.04
     return cli + cd0
 
-def clO(flapPos):
+def calcClO():
     #-2.5 0.111 stall occurs at 10deg
     #10 0.9 stall occurs at 5deg
     y1 = 0.111
@@ -209,10 +223,10 @@ def clAlpha():
     x2 = 3.3
     return (y2-y1)/(x2-x1)*180/np.pi
 def clCD():
-    cl[0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 ]
-    cdp_n5_Re150000 = [.0127 .0113 .0108 .0108 .0107 0.0106 .0113 .0123 .0153 .0215 .0320]
-    cdp_n0_Re200000 = [.0113 0.0098 .0088 .0085 .0084  .0088 .0098 .0115 .0145  .0185 .00265]
-    cdp_n_25_Re300000 = [.0098 0.0078 .0073 .0078 0.0090 .0113 0.0170 0.0220]
+##    cl[0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 ]
+##    cdp_n5_Re150000 = [.0127 .0113 .0108 .0108 .0107 0.0106 .0113 .0123 .0153 .0215 .0320]
+##    cdp_n0_Re200000 = [.0113 0.0098 .0088 .0085 .0084  .0088 .0098 .0115 .0145  .0185 .00265]
+##    cdp_n_25_Re300000 = [.0098 0.0078 .0073 .0078 0.0090 .0113 0.0170 0.0220]
 
     # ved 5deg flap cwTot~0.049 ved 0 deg 0.031 
     return 3
@@ -221,45 +235,53 @@ def calcCl():
     """
     Returns the lift coefficient
     """
-    if phase <3:
-        cl0 =cl0_2
-    else:
-        cl0 = cl0_3
-    return 2*np.pi*rad(attAng[-1])+cl0
+    #2*np.pi*rad(attAng[-1])+cl0
+    return clAlpha()*rad(attAng[-1])+calcClO()
 
 def cdInterference(Re):
     return 0.01*(150000/Re)^.5
 
-def cdInduced(cl,AR):
-    return cl^2/np.pi/AR
+def cdInduced():
+    return cl**2/np.pi/AR
 
 def calcVelAng():
     """
     Returns the angle of the velocity vector of the plane
     """
     return deg(math.atan2(v[-1],u[-1]))
-
+def  calcLoadFactor():
+    r = (x[-1]**2+y[-1]**2)**0.5
+    zentAcc = velocity[-1]**2/r
+    return (Flift(velocity[-1])+zentAcc)/g*pm
 
 def calcAttAng():
     """
     Returns the angle of attack for the plane
     """
+    if u[-1]==0 and v[-1]==0: # If the plane is stationary the attack angle should be zero
+        return 0
+    
+   
     return gamma[-1]-velAng[-1]
 
 def calcGamma():
+    global flapPos 
     """
     Returns the plane angle.
     Assumes the plane flies with gamma0 degrees towards the line all the time
     """
-    if phase <3:
-        gammaMyR = gammaR3 # Does not work!!!!!!!
+    if phase <=3:
+        gammaMyR = gammaR3 # radius of top of zoom
     else:
         gammaMyR = gammaR4 # radius of bottom of zoom
             
     
     goal = 0
     if phase == 0:
-        goal=gamma0
+        if alt==2:
+            goal=gamma0+setpointAOA # Included to simplify things for the governor
+        else:
+            goal=gamma0
     if phase == 1:
         goal=gamma0
     if phase == 2:
@@ -269,10 +291,12 @@ def calcGamma():
     if phase == 4:
         goal=climbAngle
     if goal < gamma[-1]:
-        
+        #flapPos = 0
         return max(goal,gamma[-1]-gammaMyR*dt)
     elif goal > gamma[-1]:
+        #flapPos = 0
         return min(goal,gamma[-1]+gammaMyR*dt)
+    
     else:
         return gamma[-1]
 
@@ -296,10 +320,10 @@ def gammaDesired():
     gammaDesiredAngle =  gammaDesiredAngle +( Kp*error+ Ki*integral + Kd*derivative)
 
     previous_error = error
-    if gammaDesiredAngle>90:
-        gammaDesiredAngle = 90
-    if gammaDesiredAngle<75:
-        gammaDesiredAngle = 75
+    if gammaDesiredAngle>95:
+        gammaDesiredAngle = 95
+    if gammaDesiredAngle<50:
+        gammaDesiredAngle = 50
             
             
     print "gammaDesiredAngle: ",gammaDesiredAngle ,"Error:", error
@@ -374,7 +398,7 @@ def sumForces():
     Calculates the resulting forces acting on the plane
     returns the fx and fy
     """
-    vel = sqrt(np.power(u[-1],2)+np.power(v[-1],2))
+    vel = sqrt(np.power(u[-1],2)+np.power(v[-1],2)) + windSpeed
    
 
     fx=-Fdrag(vel)*np.cos(rad(velAng[-1]))+lf[-1]*np.cos(rad(psi))-Flift(vel)*np.sin(rad(velAng[-1]))
@@ -413,7 +437,7 @@ def Euler():
 
     
 def simulate(inp):
-    global gamma,psi,wf,velAng,attAng,cd,cl,phase,pf,v0,vMin,heightPhase,counterPhase
+    global gamma,psi,wf,velAng,attAng,cd,cl,phase,pf,v0,vMin,heightPhase,counterPhase,psiAng,flapPos,dt
     """
     Runs the simulation
     """
@@ -423,11 +447,18 @@ def simulate(inp):
 
         psi = calcPsi()
         
-        gamma.append(calcGamma())
+        psiAng.append(calcPsi())
         velAng.append(calcVelAng())
+        gamma.append(calcGamma())
         attAng.append(calcAttAng())
         cl=calcCl()
         cd=calcCd()
+        clVal.append(calcCl())
+        cdVal.append(calcCd())
+        cdiVal.append(cdInduced())
+        loadFactor.append(calcLoadFactor())
+        
+        
         l.append(lLine())
         lf.append(fLine())
         Euler()
@@ -438,7 +469,13 @@ def simulate(inp):
 
         # Change phases
         if lf[-1]>pf and phase==0:
-            phase = 1
+            if alt==2: # Alt 2 does not contain any takeoff along the ground
+               phase=2
+               u[-1]   = np.cos(rad(gammaDesiredAngle))*v0      # Plane velocity in x direction [m/s]
+               v[-1]   = np.sin(rad(gammaDesiredAngle))*v0      # Plane velocity in y direction [m/s]
+            else:
+                phase = 1
+                
             heightPhase.append(y[-1])
             counterPhase.append(teller)
             #print "Phase 1: T:",T[-1],"X:",x[-1]
@@ -449,6 +486,8 @@ def simulate(inp):
             #print "Phase 2: T:",T[-1],"X:",x[-1]
         if psi > diveStartAngle and phase ==2:
             phase = 3
+            dt = dt/5
+            flapPos= flapPosPhase3
             heightPhase.append(y[-1])
             counterPhase.append(teller)
             #print "Phase 3: T:",T[-1],"X:",x[-1]
@@ -463,6 +502,7 @@ def simulate(inp):
             phase = 5
             heightPhase.append(y[-1])
             counterPhase.append(teller)
+            flapPos= flapPosPhase5
 
         teller=teller + 1
 
@@ -473,9 +513,9 @@ def simulate(inp):
         
     print "Pre tension:",pf,"Max energy:",max(E)
 
-    print "cl0:" , clO(0)
+    
     print "clAlpha:", clAlpha()
-    print "kim"
+   
     
     if max(E)==0:
         return 1000
@@ -489,26 +529,77 @@ def plotSim():
     """
     Plots some graphs providing some information
     """
+    figure(1)
     subplot(2,2,1)
     xlabel("X-Position [m]")
     ylabel("Y-Position [m]")
-    plot(x,y)
-    #axes().set_aspect('equal', 'datalim')
+    plot(x,y,"r")
+    
 
     subplot(2,2,2)
-    plot(T,lf)
-    xlabel("Time [s]")
-    ylabel("Force in wire [N]")
-
-    subplot(2,2,4)
-    plot(x[counterPhase[2]:counterPhase[3]],attAng[counterPhase[2]:counterPhase[3]])
+    plot(x,lf)
     xlabel("X-Position [m]")
-    ylabel("Angle of attack [deg]")
+    ylabel("Force in wire [N]")
 
     subplot(2,2,3)
     plot(x,velocity)
     xlabel("X-Position [m]")
     ylabel("Velocity")
+    
+    subplot(2,2,4)
+    plot(x,E)
+    xlabel("X-Position [m]")
+    ylabel("Energy [J]")
+
+
+    figure(2)
+    subplot(2,2,1)
+    plot(x,psiAng,"r")
+    xlabel("X-Position [m]")
+    ylabel("Psi angle [deg]")
+  
+    subplot(2,2,2)
+    plot(x,velAng)
+    xlabel("X-Position [m]")
+    ylabel("Velocity angle [deg]")
+
+    subplot(2,2,3)
+    plot(x,gamma)
+    xlabel("X-Position [m]")
+    ylabel("Gamma angle [deg]")
+    
+    subplot(2,2,4)
+    plot(x,attAng)
+    xlabel("X-Position [m]")
+    ylabel("Angle of attack [deg]")
+
+    figure(3)
+    subplot(2,2,1)
+    plot(x,clVal,"r")
+    xlabel("X-Position [m]")
+    ylabel("CL coeffcient [-]")
+  
+    subplot(2,2,2)
+    plot(x,cdVal)
+    xlabel("X-Position [m]")
+    ylabel("CD coeffcient [-]")
+
+    subplot(2,2,3)
+    plot(x,loadFactor)
+    xlabel("X-Position [m]")
+    ylabel("Load Factor [-]")
+    
+    subplot(2,2,4)
+    plot(x,cdiVal)
+    xlabel("X-Position [m]")
+    ylabel("CD induced coeffcient [-]")
+
+##    subplot(2,2,4)
+##    plot(x[counterPhase[2]:counterPhase[3]],attAng[counterPhase[2]:counterPhase[3]])
+##    xlabel("X-Position [m]")
+##    ylabel("Angle of attack [deg]")
+
+
     show()
     """
     subplot(2,2,3)
