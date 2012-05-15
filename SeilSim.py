@@ -65,7 +65,7 @@ Each phase of the launch determines how the plane should behave:
 """
 ******** LAUNCHCONFIGURATION IN PHASE 0*****************************
 """
-pf = 350                 # Preforce applied to the wire [N]
+pf = 150                 # Preforce applied to the wire [N]
 """
 ******** LAUNCHCONFIGURATION IN PHASE 1, in alt2 mode used as init...
 """
@@ -114,7 +114,7 @@ flapPosPhase5 = 5
 g  = 9.81               # Gavitational acceleration [m/s2]
 rho = 1.4               # Airdensity [kg/m3]
 Tmax = 50               # Maximal simulation time [s]
-dt  = 0.005              # Time step for the calculation [s]
+dt  = 0.01              # Time step for the calculation [s]
 phase = 0               # initial phase
 
 # Some global variables
@@ -143,7 +143,7 @@ def reset():
     Resets all neccecary variables
     """
     global l,lw,lf,k,lf,gamma,psi,x,y,u,v,T,attAng,velAng,omega,E,phase, velocity,gammaDesiredAngle
-    global heightPhase,integral,psiAng,cdiVal,loadFactor,cdVal,clVal,flapPos
+    global heightPhase,integral,psiAng,cdiVal,loadFactor,cdVal,clVal,flapPos,M,rpm
 
     # Some global variables
     l    = [2*l0]      # Length of the line between the winch and the plane [m]
@@ -153,6 +153,8 @@ def reset():
     gamma = [gamma0]   # Angle between plane and ground [deg]
     psi = 0.0          # Angle between line and ground [deg]
     psiAng = [0]       # Angle between line and ground [deg]
+    
+    
     
     x   = [-l[0]/2]    # Positon of the plane in x direction [m]
     y   = [0.0]        # Position of the plane in y direction [m]
@@ -172,6 +174,8 @@ def reset():
     velAng = [gamma0]  # The planes velocity angle [deg]
     omega = [0]        # Speed of the winch [rad/s]
     E = [0]            # Total energy of the plane [J]
+    M = [0]            # moment on winch cylinder [Nm]
+    rpm = [0]          # speed of winch[rpm]
     phase = 0
     integral = 0
 
@@ -195,14 +199,23 @@ def calcCd():
     """
     Returns the drag coefficient
     """
-    if phase <=3:
-        cd0 =cd0_2
-    else:
-        cd0 = cd0_3
-
     cli = cdInduced()
-    cd0 = 0.04
+    cd0 = calcCd0()
+
     return cli + cd0
+
+def calcCd0():
+    """
+    Returns the drag coefficient
+    """
+    #-2.5 0.025 drag coeff speed flap
+    #  10 0.04  drag coeff start flap
+    y1 = 0.025
+    x1 = -2.5
+    y2 = 0.04
+    x2 = 10
+    return (y2-y1)/(x2-x1)*(flapPos-x1)+y1
+   
 
 def calcClO():
     #-2.5 0.111 stall occurs at 10deg
@@ -252,7 +265,7 @@ def calcVelAng():
 def  calcLoadFactor():
     r = (x[-1]**2+y[-1]**2)**0.5
     zentAcc = velocity[-1]**2/r
-    return (Flift(velocity[-1])+zentAcc)/g*pm
+    return (Flift(velocity[-1])+loadVector *zentAcc)/g*pm
 
 def calcAttAng():
     """
@@ -265,7 +278,7 @@ def calcAttAng():
     return gamma[-1]-velAng[-1]
 
 def calcGamma():
-    global flapPos 
+    global flapPos, loadVector
     """
     Returns the plane angle.
     Assumes the plane flies with gamma0 degrees towards the line all the time
@@ -291,10 +304,12 @@ def calcGamma():
     if phase == 4:
         goal=climbAngle
     if goal < gamma[-1]:
+        loadVector = 1
         #flapPos = 0
         return max(goal,gamma[-1]-gammaMyR*dt)
     elif goal > gamma[-1]:
         #flapPos = 0
+        loadVector = -1
         return min(goal,gamma[-1]+gammaMyR*dt)
     
     else:
@@ -357,12 +372,14 @@ def diameter():
     
     
 def Swinch():
+    global M,omega,rpm,lw
     """
     Returns the length of wire which the winch collects during 1 dt
     If the torque is bigger than the stall torque, It is assumed that the winch stops and does not reverse
     """
-    M=lf[-1]*(drumDiameter/2) # Torque acting on the cylinder [Nm]
-    omega.append(min(max(0,(1-M/wst)),1)*wzs) # Rotational speed of the winch [rad/s]
+    M.append(lf[-1]*(drumDiameter/2)) # Torque acting on the cylinder [Nm]
+    omega.append(min(max(0,(1-M[-1]/wst)),1)*wzs) # Rotational speed of the winch [rad/s]
+    rpm.append(omega[-1]*60/2/np.pi)
     S = omega[-1]*(drumDiameter/2)*dt # The amount of line the winch collects [m]
     lw.append(lw[-1]+S)
     return S
@@ -398,7 +415,7 @@ def sumForces():
     Calculates the resulting forces acting on the plane
     returns the fx and fy
     """
-    vel = sqrt(np.power(u[-1],2)+np.power(v[-1],2)) + windSpeed
+    vel = sqrt(np.power(u[-1]+ windSpeed,2)+np.power(v[-1],2)) 
    
 
     fx=-Fdrag(vel)*np.cos(rad(velAng[-1]))+lf[-1]*np.cos(rad(psi))-Flift(vel)*np.sin(rad(velAng[-1]))
@@ -529,84 +546,111 @@ def plotSim():
     """
     Plots some graphs providing some information
     """
+    colors = ["r","b","m","y","bk","o"]
     figure(1)
     subplot(2,2,1)
     xlabel("X-Position [m]")
     ylabel("Y-Position [m]")
-    plot(x,y,"r")
+
+    #hold(
+    for index in range(0,len(counterPhase)-1):
+       plot(x[counterPhase[index]:counterPhase[index+1]],y[counterPhase[index]:counterPhase[index+1]],colors[index])
     
 
     subplot(2,2,2)
-    plot(x,lf)
+    for index in range(0,len(counterPhase)-1):
+        plot(x[counterPhase[index]:counterPhase[index+1]],lf[counterPhase[index]:counterPhase[index+1]],colors[index])
     xlabel("X-Position [m]")
     ylabel("Force in wire [N]")
 
     subplot(2,2,3)
-    plot(x,velocity)
+    for index in range(0,len(counterPhase)-1):
+        plot(x[counterPhase[index]:counterPhase[index+1]],velocity[counterPhase[index]:counterPhase[index+1]],colors[index])
     xlabel("X-Position [m]")
     ylabel("Velocity")
     
     subplot(2,2,4)
-    plot(x,E)
+    for index in range(0,len(counterPhase)-1):
+        plot(x[counterPhase[index]:counterPhase[index+1]],E[counterPhase[index]:counterPhase[index+1]],colors[index])
     xlabel("X-Position [m]")
     ylabel("Energy [J]")
 
 
     figure(2)
     subplot(2,2,1)
-    plot(x,psiAng,"r")
+    for index in range(0,len(counterPhase)-1):
+        plot(x[counterPhase[index]:counterPhase[index+1]],psiAng[counterPhase[index]:counterPhase[index+1]],colors[index])
     xlabel("X-Position [m]")
     ylabel("Psi angle [deg]")
   
     subplot(2,2,2)
-    plot(x,velAng)
+    for index in range(0,len(counterPhase)-1):
+        plot(x[counterPhase[index]:counterPhase[index+1]],velAng[counterPhase[index]:counterPhase[index+1]],colors[index])
     xlabel("X-Position [m]")
     ylabel("Velocity angle [deg]")
 
     subplot(2,2,3)
-    plot(x,gamma)
+    for index in range(0,len(counterPhase)-1):
+        plot(x[counterPhase[index]:counterPhase[index+1]],gamma[counterPhase[index]:counterPhase[index+1]],colors[index])
     xlabel("X-Position [m]")
     ylabel("Gamma angle [deg]")
     
     subplot(2,2,4)
-    plot(x,attAng)
+    for index in range(0,len(counterPhase)-1):
+        plot(x[counterPhase[index]:counterPhase[index+1]],attAng[counterPhase[index]:counterPhase[index+1]],colors[index])
     xlabel("X-Position [m]")
     ylabel("Angle of attack [deg]")
 
     figure(3)
     subplot(2,2,1)
-    plot(x,clVal,"r")
+    for index in range(0,len(counterPhase)-1):
+        plot(x[counterPhase[index]:counterPhase[index+1]],clVal[counterPhase[index]:counterPhase[index+1]],colors[index])
     xlabel("X-Position [m]")
     ylabel("CL coeffcient [-]")
   
     subplot(2,2,2)
-    plot(x,cdVal)
+    for index in range(0,len(counterPhase)-1):
+        plot(x[counterPhase[index]:counterPhase[index+1]],cdVal[counterPhase[index]:counterPhase[index+1]],colors[index])
     xlabel("X-Position [m]")
     ylabel("CD coeffcient [-]")
 
     subplot(2,2,3)
-    plot(x,loadFactor)
+    for index in range(0,len(counterPhase)-1):
+        plot(x[counterPhase[index]:counterPhase[index+1]],loadFactor[counterPhase[index]:counterPhase[index+1]],colors[index])
     xlabel("X-Position [m]")
     ylabel("Load Factor [-]")
+    
+    subplot(2,2,4)
+    for index in range(0,len(counterPhase)-1):
+        plot(x[counterPhase[index]:counterPhase[index+1]],cdiVal[counterPhase[index]:counterPhase[index+1]],colors[index])
+    xlabel("X-Position [m]")
+    ylabel("CD induced coeffcient [-]")
+
+    figure(4)
+    subplot(2,2,1)
+    print "len x", len(x)
+    print "len M", len(M)
+    print counterPhase[3]
+    plot(x[0:len(M)],M,"r")
+    xlabel("X-Position [m]")
+    ylabel("Moment on winch [Nm]")
+  
+    subplot(2,2,2)
+    plot(x[0:len(M)],rpm)
+    xlabel("X-Position [m]")
+    ylabel("Speed of winch [rpm]")
+
+    subplot(2,2,3)
+    plot(x,lf)
+    xlabel("X-Position [m]")
+    ylabel("Line on winch [m]")
     
     subplot(2,2,4)
     plot(x,cdiVal)
     xlabel("X-Position [m]")
     ylabel("CD induced coeffcient [-]")
 
-##    subplot(2,2,4)
-##    plot(x[counterPhase[2]:counterPhase[3]],attAng[counterPhase[2]:counterPhase[3]])
-##    xlabel("X-Position [m]")
-##    ylabel("Angle of attack [deg]")
 
-
-    show()
-    """
-    subplot(2,2,3)
-    plot(x,E)
-    xlabel("X-Position [m]")
-    ylabel("Energy [J]")
-    """
     show()
 
 
@@ -617,4 +661,7 @@ if __name__=="__main__":
     simulate([0])
     plotSim()
     
+##for x in range(0,3):
+##    dict = {'Name': 'Zara', 'Age': 7, 'Name': 'Manni'};
 
+##print "dict['Name']: ", dict['Name'];
