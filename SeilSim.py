@@ -3,6 +3,9 @@ from scipy import optimize
 from math import *
 from pylab import *
 
+from Lnd import *
+from selFunc import *
+
 
 
 
@@ -14,13 +17,20 @@ alt = 2
     3: no zooming
     4: taking out all the energy of line
 """
-"""
-********* PLANE PARAMETERS *******************************
-"""
-A  = 0.6                # Planform area of the plane [m2]
-pm  = 2                 # Mass of plane [kg]
-AR = 13                 # Aspect ratio
-wingSpan = 3            # Wingspan
+
+
+planeParameters0 = {'wingSpan':3,
+                'wingLoading':4,
+                'aspectRatio':13,
+                'refRe':150000,
+                'cdInference':0.1,
+                'cdInducedFactor':0.9,
+                'cdParasiticSpeedFlap':0.025,
+                'cdParasiticStartFlap':0.035,
+                'clAlphaCoeff':0.9,
+                'maxLoadFactor':50};
+
+
 
 """
 ********* WINCH PARAMETERS ********************************
@@ -118,25 +128,13 @@ dt  = 0.01              # Time step for the calculation [s]
 phase = 0               # initial phase
 
 # Some global variables
-cl = 0.0     # Lift Coefficient [-]
-cd = 0.0     # Drag coefficient [-]
+
 heightPhase = [0]
 counterPhase =[0]
 
 
-def deg(a):
-    """
-    Returns the argument in degrees
-    """
 
-    return float(a)*180/np.pi
 
-def rad(a):
-    """
-    Returns the argument in radians
-    """
-
-    return float(a)/180*np.pi
 
 def reset():
     """
@@ -144,6 +142,45 @@ def reset():
     """
     global l,lw,lf,k,lf,gamma,psi,x,y,u,v,T,attAng,velAng,omega,E,phase, velocity,gammaDesiredAngle
     global heightPhase,integral,psiAng,cdiVal,loadFactor,cdVal,clVal,flapPos,M,rpm
+    global planeParameters,wingArea,AR,wingSpan,pm,counterPhase
+    global cdTotal,clTotal
+    global clAlphaCoeff,speedFlapPos,startFlapPos,speedFlapCl0,startFlapCl0,flapPos
+    global AR,cdInducedFactor,clTotal,cdParasiticSpeedFlap,cdParasiticStartFlap,flapPos,Re,refRe,ReCoeff,cdInference
+    
+    counterPhase = [0]
+
+    """
+    ********* PLANE PARAMETERS *******************************
+    """
+   
+    AR = planeParameters['aspectRatio']                             # Aspect ratio [-]
+    wingSpan = planeParameters['wingSpan']                          # Wingspan [m]
+    wingLoading = planeParameters['wingLoading']                    # Wing loading [kg/m^2]
+    wingArea  = wingSpan**2*AR                                      # Planform area of the plane [m^2]
+    pm  = wingLoading*wingArea                                      # Mass of plane [kg]
+            
+    refRe = planeParameters['refRe']
+    cdInference = planeParameters['cdInference']                    # Interfernece cd factor 
+    cdInducedFactor = planeParameters['cdInducedFactor']            # Addition of cd induced factor
+    cdParasiticSpeedFlap = planeParameters['cdParasiticSpeedFlap']  # value for parasitic drag coeffcient when in speed flap mode
+    cdParasiticStartFlap = planeParameters['cdParasiticStartFlap']  # value for parasitic drag coeffcient when in speed flap mode
+    clAlphaCoeff = planeParameters['clAlphaCoeff']                  # Reduction of clAlpha from 2*pi
+    maxLoadFactor = planeParameters['maxLoadFactor']
+
+    # Not implemented...
+    ReCoeff = 0.5
+    Re = 150000
+    refRe = 150000
+    speedFlapPos = -2.5
+    startFlapPos = 10
+    speedFlapCl0 = 0.111
+    startFlapCl0 = 0.9
+    flapPos = 0
+    attAng = 0
+    
+    clTotal = [calcCl(attAng,clAlphaCoeff,speedFlapPos,startFlapPos,speedFlapCl0,startFlapCl0,flapPos)]
+    cdTotal = [calcCd(AR,cdInducedFactor,clTotal[-1],cdParasiticSpeedFlap,cdParasiticStartFlap,speedFlapPos,startFlapPos,flapPos,Re,refRe,ReCoeff,cdInference)]
+   
 
     # Some global variables
     l    = [2*l0]      # Length of the line between the winch and the plane [m]
@@ -195,73 +232,14 @@ def reset():
 
 
 
-def calcCd():
-    """
-    Returns the drag coefficient
-    """
-    cli = cdInduced()
-    cd0 = calcCd0()
 
-    return cli + cd0
-
-def calcCd0():
-    """
-    Returns the drag coefficient
-    """
-    #-2.5 0.025 drag coeff speed flap
-    #  10 0.04  drag coeff start flap
-    y1 = 0.025
-    x1 = -2.5
-    y2 = 0.04
-    x2 = 10
-    return (y2-y1)/(x2-x1)*(flapPos-x1)+y1
-   
-
-def calcClO():
-    #-2.5 0.111 stall occurs at 10deg
-    #10 0.9 stall occurs at 5deg
-    y1 = 0.111
-    x1 = -2.5
-    y2 = 0.9
-    x2 = 10
-    return (y2-y1)/(x2-x1)*(flapPos-x1)+y1
-
-def clAlpha():
-    #0deg 0.278
-    #3.5deg 0.615
-
-    y1 = 0.278
-    x1 = 0
-    y2 = 0.615
-    x2 = 3.3
-    return (y2-y1)/(x2-x1)*180/np.pi
-def clCD():
-##    cl[0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 ]
-##    cdp_n5_Re150000 = [.0127 .0113 .0108 .0108 .0107 0.0106 .0113 .0123 .0153 .0215 .0320]
-##    cdp_n0_Re200000 = [.0113 0.0098 .0088 .0085 .0084  .0088 .0098 .0115 .0145  .0185 .00265]
-##    cdp_n_25_Re300000 = [.0098 0.0078 .0073 .0078 0.0090 .0113 0.0170 0.0220]
-
-    # ved 5deg flap cwTot~0.049 ved 0 deg 0.031 
-    return 3
-
-def calcCl():
-    """
-    Returns the lift coefficient
-    """
-    #2*np.pi*rad(attAng[-1])+cl0
-    return clAlpha()*rad(attAng[-1])+calcClO()
-
-def cdInterference(Re):
-    return 0.01*(150000/Re)^.5
-
-def cdInduced():
-    return cl**2/np.pi/AR
 
 def calcVelAng():
     """
     Returns the angle of the velocity vector of the plane
     """
     return deg(math.atan2(v[-1],u[-1]))
+
 def  calcLoadFactor():
     r = (x[-1]**2+y[-1]**2)**0.5
     zentAcc = velocity[-1]**2/r
@@ -341,25 +319,25 @@ def gammaDesired():
         gammaDesiredAngle = 50
             
             
-    print "gammaDesiredAngle: ",gammaDesiredAngle ,"Error:", error
+    #print "gammaDesiredAngle: ",gammaDesiredAngle ,"Error:", error
     return gammaDesiredAngle
 
 def Flift(vel):
     """
     Returns the lift force of the plane based on the input velocity
-    Flift = cl*v^2*rho/2*A
+    Flift = cl*v^2*rho*wingArea/2
     """
 
-    return cl*vel**2*rho/2*A
+    return clTotal[-1]*vel**2*rho*wingArea/2
 
 
 def Fdrag(vel):
     """
     Returns the grad force of the plane based on the input velocity
-    Flift = cd*v^2*rho/2*A
+    Flift = cd*v^2*rho*wingArea/2
     """
 
-    return cd*vel**2*rho/2*A
+    return cdTotal[-1]*vel**2*rho*wingArea/2
 
 def diameter():
     global drumDiameter,layersOnDrum
@@ -455,6 +433,8 @@ def Euler():
     
 def simulate(inp):
     global gamma,psi,wf,velAng,attAng,cd,cl,phase,pf,v0,vMin,heightPhase,counterPhase,psiAng,flapPos,dt
+    global clAlphaCoeff,speedFlapPos,startFlapPos,speedFlapCl0,startFlapCl0,flapPos
+    global AR,cdInducedFactor,clTotal,cdParasiticSpeedFlap,cdParasiticStartFlap,flapPos,Re,refRe,ReCoeff,cdInference
     """
     Runs the simulation
     """
@@ -468,11 +448,12 @@ def simulate(inp):
         velAng.append(calcVelAng())
         gamma.append(calcGamma())
         attAng.append(calcAttAng())
-        cl=calcCl()
-        cd=calcCd()
-        clVal.append(calcCl())
-        cdVal.append(calcCd())
-        cdiVal.append(cdInduced())
+        clTotal.append(calcCl(attAng[-1],clAlphaCoeff,speedFlapPos,startFlapPos,speedFlapCl0,startFlapCl0,flapPos))
+        cdTotal.append(calcCd(AR,cdInducedFactor,clTotal[-1],cdParasiticSpeedFlap,cdParasiticStartFlap,speedFlapPos,startFlapPos,flapPos,Re,refRe,ReCoeff,cdInference))
+
+##        clVal.append(calcCl())
+##        cdVal.append(calcCd())
+##        cdiVal.append(cdInduced())
         loadFactor.append(calcLoadFactor())
         
         
@@ -503,7 +484,7 @@ def simulate(inp):
             #print "Phase 2: T:",T[-1],"X:",x[-1]
         if psi > diveStartAngle and phase ==2:
             phase = 3
-            dt = dt/5
+            #dt = dt/5
             flapPos= flapPosPhase3
             heightPhase.append(y[-1])
             counterPhase.append(teller)
@@ -523,143 +504,207 @@ def simulate(inp):
 
         teller=teller + 1
 
-
-    for index, item in enumerate(heightPhase):
-        print "Phase ",index, "Height :",item
-
-        
-    print "Pre tension:",pf,"Max energy:",max(E)
-
-    
-    print "clAlpha:", clAlpha()
+##
+##    for index, item in enumerate(heightPhase):
+##        print "Phase ",index, "Height :",item
+##
+##        
+##    print "Pre tension:",pf,"Max energy:",max(E)
+##
+##    
+##    print "clAlpha:", clAlpha()
+    return heightPhase[-1]
    
-    
-    if max(E)==0:
-        return 1000
-    else:
-        return 1/max(E)
+##    
+##    if max(E)==0:
+##        return 1000
+##    else:
+##        return 1/max(E)
 
 
 
 
-def plotSim():
+def plotSim(save):
     """
     Plots some graphs providing some information
     """
-    colors = ["r","b","m","y","bk","o"]
+    colors = ["r","b","m","y","black","o"]
+
+    #Plot for position and force,energy and velocity
     figure(1)
     subplot(2,2,1)
-    xlabel("X-Position [m]")
-    ylabel("Y-Position [m]")
-
-    #hold(
+    grid()
     for index in range(0,len(counterPhase)-1):
        plot(x[counterPhase[index]:counterPhase[index+1]],y[counterPhase[index]:counterPhase[index+1]],colors[index])
-    
+    xlabel("X-Position [m]")
+    ylabel("Y-Position [m]")   
+
 
     subplot(2,2,2)
+    grid()
     for index in range(0,len(counterPhase)-1):
         plot(x[counterPhase[index]:counterPhase[index+1]],lf[counterPhase[index]:counterPhase[index+1]],colors[index])
     xlabel("X-Position [m]")
     ylabel("Force in wire [N]")
 
     subplot(2,2,3)
+    grid()
     for index in range(0,len(counterPhase)-1):
         plot(x[counterPhase[index]:counterPhase[index+1]],velocity[counterPhase[index]:counterPhase[index+1]],colors[index])
     xlabel("X-Position [m]")
     ylabel("Velocity")
     
     subplot(2,2,4)
+    grid()
     for index in range(0,len(counterPhase)-1):
         plot(x[counterPhase[index]:counterPhase[index+1]],E[counterPhase[index]:counterPhase[index+1]],colors[index])
     xlabel("X-Position [m]")
     ylabel("Energy [J]")
 
+    if save:
+        savefig('Figures/fig1.png')
 
+# Angles plot
     figure(2)
     subplot(2,2,1)
+    grid()
     for index in range(0,len(counterPhase)-1):
         plot(x[counterPhase[index]:counterPhase[index+1]],psiAng[counterPhase[index]:counterPhase[index+1]],colors[index])
     xlabel("X-Position [m]")
     ylabel("Psi angle [deg]")
   
     subplot(2,2,2)
+    grid()
     for index in range(0,len(counterPhase)-1):
         plot(x[counterPhase[index]:counterPhase[index+1]],velAng[counterPhase[index]:counterPhase[index+1]],colors[index])
     xlabel("X-Position [m]")
     ylabel("Velocity angle [deg]")
 
     subplot(2,2,3)
+    grid()
     for index in range(0,len(counterPhase)-1):
         plot(x[counterPhase[index]:counterPhase[index+1]],gamma[counterPhase[index]:counterPhase[index+1]],colors[index])
     xlabel("X-Position [m]")
     ylabel("Gamma angle [deg]")
     
     subplot(2,2,4)
+    grid()
     for index in range(0,len(counterPhase)-1):
         plot(x[counterPhase[index]:counterPhase[index+1]],attAng[counterPhase[index]:counterPhase[index+1]],colors[index])
     xlabel("X-Position [m]")
     ylabel("Angle of attack [deg]")
 
-    figure(3)
-    subplot(2,2,1)
-    for index in range(0,len(counterPhase)-1):
-        plot(x[counterPhase[index]:counterPhase[index+1]],clVal[counterPhase[index]:counterPhase[index+1]],colors[index])
-    xlabel("X-Position [m]")
-    ylabel("CL coeffcient [-]")
-  
-    subplot(2,2,2)
-    for index in range(0,len(counterPhase)-1):
-        plot(x[counterPhase[index]:counterPhase[index+1]],cdVal[counterPhase[index]:counterPhase[index+1]],colors[index])
-    xlabel("X-Position [m]")
-    ylabel("CD coeffcient [-]")
+    if save:
+        savefig('Figures/fig2.png')
 
-    subplot(2,2,3)
-    for index in range(0,len(counterPhase)-1):
-        plot(x[counterPhase[index]:counterPhase[index+1]],loadFactor[counterPhase[index]:counterPhase[index+1]],colors[index])
-    xlabel("X-Position [m]")
-    ylabel("Load Factor [-]")
     
-    subplot(2,2,4)
-    for index in range(0,len(counterPhase)-1):
-        plot(x[counterPhase[index]:counterPhase[index+1]],cdiVal[counterPhase[index]:counterPhase[index+1]],colors[index])
-    xlabel("X-Position [m]")
-    ylabel("CD induced coeffcient [-]")
+### Drag coeffcient plots
+##    figure(3)
+##    subplot(2,2,1)
+##    grid()
+##    for index in range(0,len(counterPhase)-1):
+##        plot(x[counterPhase[index]:counterPhase[index+1]],clVal[counterPhase[index]:counterPhase[index+1]],colors[index])
+##    xlabel("X-Position [m]")
+##    ylabel("CL coeffcient [-]")
+##  
+##    subplot(2,2,2)
+##    grid()
+##    for index in range(0,len(counterPhase)-1):
+##        plot(x[counterPhase[index]:counterPhase[index+1]],cdVal[counterPhase[index]:counterPhase[index+1]],colors[index])
+##    xlabel("X-Position [m]")
+##    ylabel("CD coeffcient [-]")
+##
+##    subplot(2,2,3)
+##    grid()
+##    for index in range(0,len(counterPhase)-1):
+##        plot(x[counterPhase[index]:counterPhase[index+1]],loadFactor[counterPhase[index]:counterPhase[index+1]],colors[index])
+##    xlabel("X-Position [m]")
+##    ylabel("Load Factor [-]")
+##    
+##    subplot(2,2,4)
+##    grid()
+##    for index in range(0,len(counterPhase)-1):
+##        plot(x[counterPhase[index]:counterPhase[index+1]],cdiVal[counterPhase[index]:counterPhase[index+1]],colors[index])
+##    xlabel("X-Position [m]")
+##    ylabel("CD induced coeffcient [-]")
+##    if save:
+##        savefig('Figures/fig3.png')
+    
 
+# Winch configurations  plot
     figure(4)
+    
     subplot(2,2,1)
-    print "len x", len(x)
-    print "len M", len(M)
-    print counterPhase[3]
+    grid()
+##    print "len x", len(x)
+##    print "len M", len(M)
+##    print counterPhase[3]
     plot(x[0:len(M)],M,"r")
     xlabel("X-Position [m]")
     ylabel("Moment on winch [Nm]")
   
     subplot(2,2,2)
+    grid()
     plot(x[0:len(M)],rpm)
     xlabel("X-Position [m]")
     ylabel("Speed of winch [rpm]")
 
     subplot(2,2,3)
+    grid()
     plot(x,lf)
     xlabel("X-Position [m]")
     ylabel("Line on winch [m]")
     
     subplot(2,2,4)
-    plot(x,cdiVal)
+    grid()
+    plot(x,y)
     xlabel("X-Position [m]")
     ylabel("CD induced coeffcient [-]")
+    if save:
+        savefig('Figures/fig4.png')
 
+   
+    #show()
 
-    show()
+def sensitivity():
+    global planeParameters
+    planeParameters = planeParameters0.copy()
+    
+    refHeight = simulate([0])
+    svarMin = [refHeight]
+    svarMax = [refHeight]
+    plotSim(1)
+
+    for key, value in planeParameters0.items():
+        value = planeParameters0[key]
+        refValue = value
+        planeParameters[key] = value*.9
+        minVal = planeParameters[key]
+        minRes = simulate([0])
+
+        value = planeParameters0[key]
+        planeParameters[key] = value*1.1
+        maxVal = planeParameters[key]
+        maxRes = simulate([0])
+
+        svarMin.append(minRes)
+        svarMax.append(maxRes)
+        print key, "Ref:",refValue," -- ", refHeight, " Min: ",minVal," -- " ,minRes,"Max: ",maxVal," -- ", maxRes
+        
 
 
 
 if __name__=="__main__":
+     
     #lim = ([0,300],[0,50])
     #res=optimize.brute(simulate,lim,Ns=4)
-    simulate([0])
-    plotSim()
+##    planeParameters = planeParameters0
+##    refHeight = simulate([0])
+##    plotSim(1)
+    print "Start!!!!"
+    sensitivity()
+    print "Done!!!!"
+                      
     
 ##for x in range(0,3):
 ##    dict = {'Name': 'Zara', 'Age': 7, 'Name': 'Manni'};
