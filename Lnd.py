@@ -14,11 +14,31 @@ from pylab import *
 
 from selFunc import *
 
+def Flift(cl,velocity,rho,wingArea):
+    """
+    Returns the lift force of the plane based on the input velocity
+    Flift = cl*v^2*rho*wingArea/2
+    """
+
+    return cl*velocity**2*rho*wingArea/2
+
+
+def Fdrag(cd,velocity,rho,wingArea):
+    """
+    Returns the grad force of the plane based on the input velocity
+    Flift = cd*v^2*rho*wingArea/2
+    """
+
+    return cd*velocity**2*rho*wingArea/2
+
+def velocityMin(flapPos):
+    return 9
+
 # Drag formulas
 def calcCd(AR,cdInducedFactor,cl,cdParasiticSpeedFlap,cdParasiticStartFlap,speedFlapPos,startFlapPos,flapPos,Re,refRe,ReCoeff,cdInference):
     """
     Returns the total drag coefficient
-    """ 
+    """
     cli = cdInduced(AR,cdInducedFactor,cl)
     cdp = cdParasitic(cdParasiticSpeedFlap,cdParasiticStartFlap,speedFlapPos,startFlapPos,flapPos,Re,refRe,ReCoeff)
     cdf = cdInterference(cdInference,Re,refRe,ReCoeff)
@@ -47,7 +67,7 @@ def cdInduced(AR,cdInducedFactor,cl):
     """
     Returns the induced drag coefficient
     """
-    # 0.95 < cdInducedFactor < 1 
+    # 0.95 < cdInducedFactor < 1
     return cl**2/(np.pi*AR*cdInducedFactor)
 
 
@@ -88,7 +108,7 @@ def clCD():
 ##    cdp_n0_Re200000 = [.0113 0.0098 .0088 .0085 .0084  .0088 .0098 .0115 .0145  .0185 .00265]
 ##    cdp_n_25_Re300000 = [.0098 0.0078 .0073 .0078 0.0090 .0113 0.0170 0.0220]
 
-    # ved 5deg flap cwTot~0.049 ved 0 deg 0.031 
+    # ved 5deg flap cwTot~0.049 ved 0 deg 0.031
     return 3
 
 
