@@ -8,6 +8,32 @@
 # Copyright:   (c) skatun 2012
 # Licence:     <your licence>
 #-------------------------------------------------------------------------------
+import numpy as np
+from pylab import *
+import SeilSim as ss
+
+def initPlot(_x,_y,_counterPhase):
+    global x,y,counterPhase,colors
+    colors = ["r","b","m","y","black","o"]
+    x = _x
+    y = _y
+    counterPhase = _counterPhase
+
+def plotXY(showOn,saveOn):
+    figure(1)
+    grid()
+
+##    for index in range(0,len(counterPhase)-1):
+##       plot(x[counterPhase[index]:counterPhase[index+1]],y[counterPhase[index]:counterPhase[index+1]],colors[index])
+    plot(x,y)
+    xlabel("X-Position [m]")
+    ylabel("Y-Position [m]")
+
+    if showOn:
+        show()
+    if saveOn:
+        savefig('Figures/fig1.png')
+
 def plotSim(save,plotOn):
     """
     Plots some graphs providing some information

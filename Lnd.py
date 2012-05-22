@@ -111,6 +111,5 @@ def clCD():
     # ved 5deg flap cwTot~0.049 ved 0 deg 0.031
     return 3
 
-
-
-
+def velocityMin(flapPos):
+    return 9.0

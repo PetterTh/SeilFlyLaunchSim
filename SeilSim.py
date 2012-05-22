@@ -6,7 +6,8 @@ from random import *
 
 from Lnd import *
 from selFunc import *
-
+from winch import *
+from plotSim import *
 
 
 
@@ -72,7 +73,7 @@ def init():
                                 'humidity':0};
 
 
-
+    initSim()
 
     return planeParameters0,flightParameters0, winchParameters0,lineParameters0,flighConditionsParameters0
 
@@ -83,18 +84,23 @@ def reset(planeParameters,flightParameters,winchParameters,lineParameters,flighC
     """
     #Plane parameters
     global AR,wingArea,pm,refRe,cdInference,cdInducedFactor,cdParasiticSpeedFlap
-    global cdParasiticStartFlap,clAlphaCoeff,maxLoadFactor
+    global cdParasiticStartFlap,clAlphaCoeff,maxLoadFactor,vMinMy
 
     #Flight parameters
     global clAlphaCoeff,speedFlapPos,startFlapPos,speedFlapCl0,startFlapCl0,flapPos
-    global gamma0
+    global gamma0,gammaR1,gammaR2,preTensionOfLine,takeOffSpeed,setpointAOA
 
     #Flight conditions parameters
     global humidity,pressureAtGround,tempAtGround,windSpeed,thermic,thermicCeil
 
     #Line parameters
-    global totalLineLength
+    global totalLineLength,EModule
 
+    #Winch parameters
+    global distanceToPulley,drumDiameter,wzs,wst,_lineOnWinch
+
+
+    # need to delete these
     global l,lw,lf,k,lf,gamma,psi,x,y,u,v,T,attAng,velAng,omega,E,phase, velocity,gammaDesiredAngle
     global heightPhase,integral,psiAng,cdiVal,loadFactor,cdVal,clVal,flapPos,M,rpm
     global wingArea,AR,wingSpan,pm,counterPhase
@@ -122,14 +128,15 @@ def reset(planeParameters,flightParameters,winchParameters,lineParameters,flighC
     cdParasiticStartFlap = float(planeParameters['cdParasiticStartFlap'])  # value for parasitic drag coeffcient when in speed flap mode
     clAlphaCoeff = float(planeParameters['clAlphaCoeff'])                  # Reduction of clAlpha from 2*pi
     maxLoadFactor = float(planeParameters['maxLoadFactor'])
+    speedFlapCl0  = float(planeParameters['speedFlapCl0'])
+    startFlapCl0 = float(planeParameters['startFlapCl0'])
 
     # Not implemented...
     ReCoeff = float(planeParameters['ReCoeff'])
     Re = float(150000)
 
 
-    speedFlapCl0  = float(planeParameters['speedFlapCl0'])
-    startFlapCl0 = float(planeParameters['startFlapCl0'])
+
 
 
     """
@@ -142,13 +149,13 @@ def reset(planeParameters,flightParameters,winchParameters,lineParameters,flighC
     ******** LAUNCHCONFIGURATION IN PHASE 0*****************************
     """
     # Preforce applied to the wire [N]
-    pf = float(flightParameters['preTensionOfLine'])
+    preTensionOfLine = float(flightParameters['preTensionOfLine'])
 
     """
     ******** LAUNCHCONFIGURATION IN PHASE 1, in alt2 mode used as init...
     """
     # Takeoff speed [m/s]
-    v0 = float(flightParameters['takeOffSpeed'])
+    takeOffSpeed = float(flightParameters['takeOffSpeed'])
 
     # Launch angle [deg]
     gamma0 = float(flightParameters['launchAngle'])
@@ -189,7 +196,7 @@ def reset(planeParameters,flightParameters,winchParameters,lineParameters,flighC
     ******** LAUNCHCONFIGURATION IN PHASE 5 *****************************
     """
     flapPosPhase5 = float(flightParameters['thermicFlapPos'])
-    vMin = velocityMin(flapPosPhase5)
+    vMinMy = float(velocityMin(flapPosPhase5))
     # Rate of gamma change [deg/s]. A maximal value of which the gamma
     # can change per second. Used to limit the turn rate
     gammaR3 = float(flightParameters['gammaR3'])
@@ -208,7 +215,7 @@ def reset(planeParameters,flightParameters,winchParameters,lineParameters,flighC
 
     # Distance between the winch and the pulley. The plane is assumed to start
     # at the same location as the winch [m]
-    l0 = float(winchParameters['distanceToPulley'])
+    distanceToPulley = float(winchParameters['distanceToPulley'])
 
     # Length of winch drum
     drumLength = float(winchParameters['drumLength'])
@@ -252,7 +259,46 @@ def reset(planeParameters,flightParameters,winchParameters,lineParameters,flighC
     humidity = float(flighConditionsParameters['humidity'])
 
 
+
+def initSim():
+    """
+    Here goes all the other variables that we need
+    """
+    global Tmax,dt,phase,colors
+    global integral,gammaDesiredAngle,previous_error,gammaDesiredAngle0,Kp,Kd,Ki
+    Tmax = 50               # Maximal simulation time [s]
+    dt  = 0.005              # Time step for the calculation [s]
+    phase = 0               # initial phase
+
+    integral  = 0           # used for the I controller
+    previous_error = 0
+
+
+    Kp = 1.1
+    Ki = 0
+    Kd = 0
+
+
+    # rewrite all this ........
+    gammaDesiredAngle0 = 100  # init for the climbangle
+    if alt ==1:
+        gammaDesiredAngle = gammaDesiredAngle0 # Launch angle init
+
+    if alt == 2:
+        gammaDesiredAngle = 0 #gamma0 # Launch angle init
+
+
+
+    colors = ["r","b","m","y","black","o"]
+
 def loggingReset():
+    global _u,_v,_x,_y,_ax,_ay
+    global _attAng,_velAng,_psi,_gamma
+    global _flapPos
+    global _lineLengthToPlane,_velocity,_rho,_clTotal,_cdTotal,_fDrag,_fLift
+    global _lineForce,_lineDiameter,_kLine,_fx,_fy
+    global E,T
+    global _drumDiameter,_momentOnWinchDrum,_lineOnWinch
     """
     Each phase of the launch determines how the plane should behave:
         0: Preload the wire. The plane is stationary and the winch starts to tention the wire
@@ -260,68 +306,64 @@ def loggingReset():
         2: Liftoff and climb. The plane increases the angle of attack and leaves the ground. This phase starts when the takeoffspeed (v0) is reached
         3: Dive. At the peak height the plane starts to dive against the pulley to increase its energy
         4: Climb. The winch is released and the plane starts to climb.
+        5: Climb is ended and plane is flying straight ahead with thermic setting.
 
     """
 
-
-
-
-
-
-    # Some global variables
-
-    heightPhase = [0]
-    counterPhase =[0]
-    counterPhase = [0]
-    integral  = 0           # used for the I controller
-    previous_error = 0
-    gammaDesiredAngle0 = 100  # init for the climbangle
-    Kp = 1.1
-    Ki = 0
-    Kd = 0
-
-    flapPos = float(0)
-    attAng = float(0)
+    # Logging arrays.......
+    _flapPos = [0]
+    _attAng = [0]       # Angle of attack [deg]
+    _velAng = [gamma0]  # The planes velocity angle [deg]
     layersOnDrum = 1        # Layers of line on drum
 
 
-    clTotal = [calcCl(attAng,clAlphaCoeff,speedFlapPos,startFlapPos,speedFlapCl0,startFlapCl0,flapPos)]
-    cdTotal = [calcCd(AR,cdInducedFactor,clTotal[-1],cdParasiticSpeedFlap,cdParasiticStartFlap,speedFlapPos,startFlapPos,flapPos,Re,refRe,ReCoeff,cdInference)]
+    _clTotal = [calcCl(_attAng[-1],clAlphaCoeff,speedFlapPos,startFlapPos,speedFlapCl0,startFlapCl0,_flapPos[-1])]
+    _cdTotal = [calcCd(AR,cdInducedFactor,_clTotal[-1],cdParasiticSpeedFlap,cdParasiticStartFlap,speedFlapPos,startFlapPos,_flapPos[-1],Re,refRe,ReCoeff,cdInference)]
 
+    if alt==1:
+        _u   = [0.0]      # Plane velocity in x direction [m/s]
+        _v   = [0.0]      # Plane velocity in y direction [m/s]
+        _gamma = [0]   # Angle between plane and ground [deg]
 
+    elif alt == 2:
+        _u   = [np.cos(rad(gamma0))*takeOffSpeed ]      # Plane velocity in x direction [m/s]
+        _v   = [np.sin(rad(gamma0))*takeOffSpeed ]      # Plane velocity in y direction [m/s]
+        _gamma = [gamma0]   # Angle between plane and ground [deg]
 
+    #Not implemented
+    else:
+        _u   = [0.0]      # Plane velocity in x direction [m/s]
+        _v   = [0.0]      # Plane velocity in y direction [m/s]
+        _gamma = [0]   # Angle between plane and ground [deg]
+
+    _velocity = [0] # Apperent velocity
+
+    _x   = [-distanceToPulley]    # Positon of the plane in x direction [m]
+    _y   = [0.0]        # Position of the plane in y direction [m]
+
+    _ax = [0.0]
+    _ay = [0.0]
 
     # Some global variables
-    l    = [totalLineLength]      # Length of the line between the winch and the plane [m]
-    lw    = [0]        # Meters of line on the winch [m]
-    lf  = [0]          # Lineforce [N]
-
-    gamma = [gamma0]   # Angle between plane and ground [deg]
-    psi = 0.0          # Angle between line and ground [deg]
-    psiAng = [0]       # Angle between line and ground [deg]
+    _lineLengthToPlane    = [totalLineLength]      # Length of the line between the winch and the plane [m]
+    _lineOnWinch    = [0]        # Meters of line on the winch [m]
+    _lineForce  = [0]          # Lineforce [N]
 
 
+    _psi = [0.0]          # Angle between line and ground [deg]
 
-    x   = [-l[0]/2]    # Positon of the plane in x direction [m]
-    y   = [0.0]        # Position of the plane in y direction [m]
 
-    if alt ==1:
-        gammaDesiredAngle = gammaDesiredAngle0 # Launch angle init
-
-    if alt == 2:
-        gammaDesiredAngle = gamma0 # Launch angle init
-
-    u   = [0]      # Plane velocity in x direction [m/s]
-    v   = [0]      # Plane velocity in y direction [m/s]
-
-    velocity = [0]     # Plane total velocity
     T  = [0.0]         # Accumulated time [s]
-    attAng = [0]       # Angle of attack [deg]
-    velAng = [gamma0]  # The planes velocity angle [deg]
+
     omega = [0]        # Speed of the winch [rad/s]
     E = [0]            # Total energy of the plane [J]
-    M = [0]            # moment on winch cylinder [Nm]
+
     rpm = [0]          # speed of winch[rpm]
+    _drumDiameter = [drumDiameter]
+
+    # moment on winch cylinder [Nm]
+    _momentOnWinchDrum = [momentOnWinchDrum(_lineForce[-1],_drumDiameter[-1])]
+
     phase = 0
     integral = 0
 
@@ -332,27 +374,32 @@ def loggingReset():
     cdVal = [0] #drag coefficient
     loadFactor = [0] # loadfactor
 
+    _lineDiameter = [lineDiameter()]
+    _kLine = [kLine(EModule,_lineDiameter[-1])]
+
 
     """
     *********** STANDARD CONFIGURATION *********************************
     """
     # Airdensity [kg/m3]
-    rho = densityWithHumidity(humidity,pressureAtGround,tempAtGround,y[-1])
-    Tmax = 50               # Maximal simulation time [s]
-    dt  = 0.005              # Time step for the calculation [s]
-    phase = 0               # initial phase
+    _rho = [densityWithHumidity(humidity,pressureAtGround,tempAtGround,_y[-1])]
 
     """
     Here we add some logging features ...
     """
-    heightPhase[phase] = y[-1]
-    counterPhase[phase]= 0
+
+    _fDrag = [Fdrag(_cdTotal[-1],_velocity[-1],_rho[-1],wingArea)]
+    _fLift = [Flift(_clTotal[-1],_velocity[-1],_rho[-1],wingArea)]
+
+    _fx = [0]
+    _fy = [0]
+
 
 def calcVelAng():
     """
     Returns the angle of the velocity vector of the plane
     """
-    return deg(math.atan2(v[-1],u[-1]))
+    return deg(math.atan2(_v[-1],_u[-1]))
 
 def  calcLoadFactor():
     r = (x[-1]**2+y[-1]**2)**0.5
@@ -363,22 +410,22 @@ def calcAttAng():
     """
     Returns the angle of attack for the plane
     """
-    if u[-1]==0 and v[-1]==0: # If the plane is stationary the attack angle should be zero
+    if _u[-1]==0 and _v[-1]==0: # If the plane is stationary the attack angle should be zero
         return 0
 
 
-    return gamma[-1]-velAng[-1]
+    return _gamma[-1]-_velAng[-1]
 
 def calcGamma():
-    global flapPos, loadVector
+    global _flapPos, loadVector
     """
     Returns the plane angle.
     Assumes the plane flies with gamma0 degrees towards the line all the time
     """
     if phase <=3:
-        gammaMyR = gammaR3 # radius of top of zoom
+        gammaMyR = gammaR1 # radius of top of zoom
     else:
-        gammaMyR = gammaR4 # radius of bottom of zoom
+        gammaMyR = gammaR2 # radius of bottom of zoom
 
 
     goal = 0
@@ -390,22 +437,23 @@ def calcGamma():
     if phase == 1:
         goal=gamma0
     if phase == 2:
-        goal=gammaDesired()-psi
+        goal=gammaDesired()-_psi[-1]
     if phase == 3:
-       goal= -psi
+       goal= -_psi[-1]
     if phase == 4:
         goal=climbAngle
-    if goal < gamma[-1]:
+        print "climbing"
+    if goal < _gamma[-1]:
         loadVector = 1
         #flapPos = 0
-        return max(goal,gamma[-1]-gammaMyR*dt)
-    elif goal > gamma[-1]:
+        return max(goal,_gamma[-1]-gammaMyR*dt)
+    elif goal > _gamma[-1]:
         #flapPos = 0
         loadVector = -1
-        return min(goal,gamma[-1]+gammaMyR*dt)
+        return min(goal,_gamma[-1]+gammaMyR*dt)
 
     else:
-        return gamma[-1]
+        return _gamma[-1]
 
 
 
@@ -415,7 +463,7 @@ def calcPsi():
 
     """
 
-    return deg(math.atan2(y[-1],(-x[-1])))
+    return deg(math.atan2(_y[-1],(-_x[-1])))
 
 def gammaDesired():
     global integral,gammaDesiredAngle,previous_error
@@ -441,44 +489,82 @@ def gammaDesired():
 def sumForces():
     """
     Calculates the resulting forces acting on the plane
-    returns the fx and fy
     """
-    velocity = sqrt((u[-1]+ windSpeed)**2+ (v[-1])**2)
+    global _lineLengthToPlane,_velocity,_rho,_clTotal,_cdTotal,_fDrag,_fLift
+    global _lineForce,_fx,_fy,_kLine,_lineDiameter,_lineOnWinch
 
-    clTotal = [calcCl(attAng,clAlphaCoeff,speedFlapPos,startFlapPos,speedFlapCl0,startFlapCl0,flapPos)]
-    cdTotal = [calcCd(AR,cdInducedFactor,clTotal[-1],cdParasiticSpeedFlap,cdParasiticStartFlap,speedFlapPos,startFlapPos,flapPos,Re,refRe,ReCoeff,cdInference)]
+    _velocity.append( sqrt((_u[-1]+ windSpeed)**2+ (_v[-1])**2))
+    _rho.append(densityWithHumidity(humidity,pressureAtGround,tempAtGround,_y[-1]))
 
-    fx=-Fdrag(cdTotal,velocity,rho,wingArea)*np.cos(rad(velAng[-1]))+lf[-1]*np.cos(rad(psi))-Flift(clTotal,velocity,rho,wingArea)*np.sin(rad(velAng[-1]))
-    fy=-Fdrag(cdTotal,velocity,rho,wingArea)*np.sin(rad(velAng[-1]))-lf[-1]*np.sin(rad(psi))+Flift(clTotal,velocity,rho,wingArea)*np.cos(rad(velAng[-1]))-g()*pm
+    _psi.append(calcPsi())
+    _velAng.append(calcVelAng())
+    _gamma.append(calcGamma())
+    _attAng.append(calcAttAng())
+    _clTotal.append(calcCl(_attAng[-1],clAlphaCoeff,speedFlapPos,startFlapPos,speedFlapCl0,startFlapCl0,_flapPos[-1]))
+    _cdTotal.append(calcCd(AR,cdInducedFactor,_clTotal[-1],cdParasiticSpeedFlap,cdParasiticStartFlap,speedFlapPos,startFlapPos,_flapPos[-1],Re,refRe,ReCoeff,cdInference))
 
-    return fx,fy
+
+    if phase>0:
+        gravityForce = g()*pm
+        _fDrag.append(Fdrag(_cdTotal[-1],_velocity[-1],_rho[-1],wingArea))
+        _fLift.append(Flift(_clTotal[-1],_velocity[-1],_rho[-1],wingArea))
+    else:
+        _fDrag.append(0)
+        _fLift.append(0)
+        gravityForce = 0
 
 
-def Euler():
+    _lineLengthToPlane.append(lineLength(_x[-1],_y[-1],distanceToPulley))
+    _lineDiameter.append(lineDiameter())
+    _kLine.append(kLine(EModule,_lineDiameter[-1]))
+    _momentOnWinchDrum.append(momentOnWinchDrum(_lineForce[-1],_drumDiameter[-1]))
+    s = Swinch(_lineForce[-1],_drumDiameter[-1],wst,wzs,_momentOnWinchDrum[-1],dt)
+    _lineOnWinch.append(_lineOnWinch[-1]+s)
+
+    deltaLineLengthMy = _lineLengthToPlane[-1]-_lineLengthToPlane[-2] + s
+    deltaLineForceMy = deltaLineForce(_lineLengthToPlane[-1],deltaLineLengthMy,_kLine[-1])
+
+    _lineForce.append(lineForce(phase,_lineForce[-1],deltaLineForceMy))
+
+
+
+    _fx.append(-_fDrag[-1]*np.cos(rad(_velAng[-1]))+_lineForce[-1]*np.cos(rad(_psi[-1]))-_fLift[-1]*np.sin(rad(_velAng[-1])))
+    _fy.append(-_fDrag[-1]*np.sin(rad(_velAng[-1]))-_lineForce[-1]*np.sin(rad(_psi[-1]))+_fLift[-1]*np.cos(rad(_velAng[-1]))- gravityForce)
+
+
+
+
+
+def euler():
     """
     Calculates the new position of the plane using forward Euler iteration
     Does not allow the plane to go below y=0 as this is ground level
     """
-
+    global _u,_v,_ax,_ay
     if phase == 0:
-        u.append(0)
-        v.append(0)
+        sumForces()
+        _u.append(0)
+        _v.append(0)
+        _ax.append(0)
+        _ay.append(0)
     elif phase ==1 and alt ==1:
-        fx,fy = sumForces()
-        ax=fx/pm
-        ay=fy/pm
-        u.append(u[-1]+ax*dt)
-        v.append(0)
+        sumForces()
+        _ax.append(_fx[-1]/pm)
+        _ay.append(_fy[-1]/pm)
+        _u.append(_u[-1]+_ax[-1]*dt)
+        _v.append(0)
 
     else:
-        fx,fy = sumForces()
-        ax=fx/pm
-        ay=fy/pm
-        u.append(u[-1]+ax*dt)
-        v.append(v[-1]+ay*dt)
+        sumForces()
+        _ax.append(_fx[-1]/pm)
+        _ay.append(_fy[-1]/pm)
+        _u.append(_u[-1]+_ax[-1]*dt)
+        _v.append(_v[-1]+_ay[-1]*dt)
 
-    x.append(x[-1]+u[-1]*dt)
-    y.append(max(y[-1]+v[-1]*dt,0))
+    _x.append(_x[-1]+_u[-1]*dt)
+    _y.append(max(_y[-1]+_v[-1]*dt,0)) #To make sure y always is positive
+
+
 
 
 def runInit(plotOn):
@@ -490,88 +576,79 @@ def runInit(plotOn):
     return height
 
 def simulate(inp):
-    global gamma,psi,wf,velAng,attAng,cd,cl,phase,pf,v0,vMin,heightPhase,counterPhase,psiAng,flapPos,dt
-    global clAlphaCoeff,speedFlapPos,startFlapPos,speedFlapCl0,startFlapCl0,flapPos
+    global _flapPos,dt
+    global T,E
     global AR,cdInducedFactor,clTotal,cdParasiticSpeedFlap,cdParasiticStartFlap,flapPos,Re,refRe,ReCoeff,cdInference
+    global phase,counterPhase
     """
     Runs the simulation
     """
-    reset()
+    #reset()
     teller = 0
-    while T[-1]<=Tmax and y[-1] >= -10.0 and phase<5:
+    heightPhase = [0.0]
+    counterPhase = [0]
+    while T[-1]<=Tmax and _y[-1] >= -10.0 and phase<5:
 
-        psi = calcPsi()
 
-        psiAng.append(calcPsi())
-        velAng.append(calcVelAng())
-        gamma.append(calcGamma())
-        attAng.append(calcAttAng())
-        clTotal.append(calcCl(attAng[-1],clAlphaCoeff,speedFlapPos,startFlapPos,speedFlapCl0,startFlapCl0,flapPos))
-        cdTotal.append(calcCd(AR,cdInducedFactor,clTotal[-1],cdParasiticSpeedFlap,cdParasiticStartFlap,speedFlapPos,startFlapPos,flapPos,Re,refRe,ReCoeff,cdInference))
 
 ##        clVal.append(calcCl())
 ##        cdVal.append(calcCd())
 ##        cdiVal.append(cdInduced())
-        loadFactor.append(calcLoadFactor())
+        #loadFactor.append(calcLoadFactor())
 
-
-        l.append(lLine())
-        lf.append(fLine())
-        Euler()
+        euler()
         T.append(T[-1]+dt)
-        E.append(y[-1]*g()*pm+0.5*pm*(u[-1]**2+v[-1]**2))
-        velocity.append((u[-1]**2+v[-1]**2)**0.5)
+        E.append(_y[-1]*g()*pm+0.5*pm*_velocity[-1]**2)
+
         #print T[-1],attAng,gamma
 
         # Change phases
-        if lf[-1]>pf and phase==0:
+        if _lineForce[-1]>preTensionOfLine and phase==0:
             if alt==2: # Alt 2 does not contain any takeoff along the ground
                phase=2
-               u[-1]   = np.cos(rad(gammaDesiredAngle))*v0      # Plane velocity in x direction [m/s]
-               v[-1]   = np.sin(rad(gammaDesiredAngle))*v0      # Plane velocity in y direction [m/s]
             else:
                 phase = 1
 
-            heightPhase.append(y[-1])
+            heightPhase.append(_y[-1])
             counterPhase.append(teller)
-            #print "Phase 1: T:",T[-1],"X:",x[-1]
-        if (u[-1]**2+v[-1]**2)**0.5>v0 and phase==1:
+            print "Phase 1: T:",T[-1],"X:",_x[-1]
+        if _velocity[-1]>takeOffSpeed and phase==1:
             phase = 2
-            heightPhase.append(y[-1])
+            heightPhase.append(_y[-1])
             counterPhase.append(teller)
-            #print "Phase 2: T:",T[-1],"X:",x[-1]
-        if psi > diveStartAngle and phase ==2:
+            print "Phase 2: T:",T[-1],"X:",_x[-1]
+        if _psi[-1] > diveStartAngle and phase ==2:
             phase = 3
             #dt = dt/5
-            flapPos= flapPosPhase3
-            heightPhase.append(y[-1])
+            _flapPos[-1] = flapPosPhase3
+            heightPhase.append(_y[-1])
             counterPhase.append(teller)
-            #print "Phase 3: T:",T[-1],"X:",x[-1]
+            print "Phase 3: T:",T[-1],"X:",_x[-1]
 
-        if (y[-1]<50 or lf[-1]==0) and phase ==3:
+        if (_y[-1]<50 or _lineForce[-1]==0) and phase ==3:
             phase = 4
-            heightPhase.append(y[-1])
+            heightPhase.append(_y[-1])
             counterPhase.append(teller)
-            #print "Phase 4: T:",T[-1],"X:",x[-1]
+            if _y[-1]<50:
+                print "diveHeight reached"
+            if _lineForce[-1]==0:
+                print "all lineForce used"
+            print "Phase 4: T:",T[-1],"X:",_x[-1]
 
-        if (u[-1]**2+v[-1]**2)**0.5<vMin and phase>3:
+        if _velocity[-1]<vMinMy and phase>3:
             phase = 5
-            heightPhase.append(y[-1])
+            heightPhase.append(_y[-1])
             counterPhase.append(teller)
-            flapPos= flapPosPhase5
+            _flapPos[-1]= flapPosPhase5
+            print "Phase 5: T:",T[-1],"X:",_x[-1]
 
         teller=teller + 1
 
-##
-##    for index, item in enumerate(heightPhase):
-##        print "Phase ",index, "Height :",item
-##
-##
-##    print "Pre tension:",pf,"Max energy:",max(E)
-##
-##
-##    print "clAlpha:", clAlpha()
-    return heightPhase[-1]
+        if phase==4:
+            print "x:",_x[-1],"y:",_y[-1]
+
+    heightPhase.append(_y[-1])
+    return heightPhase
 
 ##
 ##    if max(E)==0:
@@ -687,7 +764,14 @@ if __name__=="__main__":
 ##    refHeight = simulate([0])
 ##    plotSim(1)
     print "Start!!!!"
-    sensitivity(runInit(0))
+    planeParameters,flightParameters,winchParameters,lineParameters,flighConditionsParameters = init()
+    reset(planeParameters,flightParameters,winchParameters,lineParameters,flighConditionsParameters)
+    loggingReset()
+    print simulate([3])
+    initPlot(_x,_y,counterPhase)
+    plotXY(1,1)
+
+    #sensitivity(runInit(0))
     print "Done!!!!"
 
 

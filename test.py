@@ -17,7 +17,7 @@ def main():
     planeParameters,flightParameters,winchParameters,lineParameters,flighConditionsParameters = init()
     reset(planeParameters,flightParameters,winchParameters,lineParameters,flighConditionsParameters)
     loggingReset()
-    sumForces()
+    print simulate([3])
 
 def testSensitivity():
     planeParameters,flightParameters,winchParameters,lineParameters,flighConditionsParameters = init()
