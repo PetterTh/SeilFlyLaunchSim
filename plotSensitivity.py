@@ -19,7 +19,7 @@ def plotSensitivity(sensitivity,keys,exploded,showMy,save):
 ##    pie(sensitivity, explode=None, labels=keys)
 
 
-    for i in range(0,3):
+    for i in range(0,2):
         figureNumber = getFigureNumber()
         sensitivityCol = sensitivity[:,i]
 

@@ -8,7 +8,7 @@ from Lnd import *
 from selFunc import *
 from winch import *
 from plotSim import *
-
+from plotSensitivity import *
 
 
 # Some global parameters
@@ -72,16 +72,26 @@ def init():
                                 'pressureAtGround':101325,
                                 'humidity':0};
 
+    paraMeterArray0 = planeParameters0.copy()
+    paraMeterArray0.update(flightParameters0)
+    paraMeterArray0.update(winchParameters0)
+    paraMeterArray0.update(lineParameters0)
+    paraMeterArray0.update(flighConditionsParameters0)
+
+
+    #paraMeterArray0 = [planeParameters0,flightParameters0, winchParameters0,lineParameters0,flighConditionsParameters0]
+
 
     initSim()
 
-    return planeParameters0,flightParameters0, winchParameters0,lineParameters0,flighConditionsParameters0
+    return paraMeterArray0,planeParameters0,flightParameters0, winchParameters0,lineParameters0,flighConditionsParameters0
 
 
-def reset(planeParameters,flightParameters,winchParameters,lineParameters,flighConditionsParameters):
+def reset():
     """
     Resets all neccecary variables
     """
+
     #Plane parameters
     global AR,wingArea,pm,refRe,cdInference,cdInducedFactor,cdParasiticSpeedFlap
     global cdParasiticStartFlap,clAlphaCoeff,maxLoadFactor,vMinMy
@@ -115,24 +125,24 @@ def reset(planeParameters,flightParameters,winchParameters,lineParameters,flighC
     ********* PLANE PARAMETERS *******************************
     """
 
-    AR = float(planeParameters['aspectRatio'])                             # Aspect ratio [-]
-    wingSpan = float(planeParameters['wingSpan'])                          # Wingspan [m]
-    wingLoading = float(planeParameters['wingLoading'])                    # Wing loading [kg/m^2]
+    AR = float(paraMeterArray['aspectRatio'])                             # Aspect ratio [-]
+    wingSpan = float(paraMeterArray['wingSpan'])                          # Wingspan [m]
+    wingLoading = float(paraMeterArray['wingLoading'])                    # Wing loading [kg/m^2]
     wingArea  = float(wingSpan**2/AR)                                      # Planform area of the plane [m^2]
     pm  = float(wingLoading*wingArea)                                      # Mass of plane [kg]
 
-    refRe = float(planeParameters['refRe'])
-    cdInference = float(planeParameters['cdInference'])                    # Interfernece cd factor
-    cdInducedFactor = float(planeParameters['cdInducedFactor'])            # Addition of cd induced factor
-    cdParasiticSpeedFlap = float(planeParameters['cdParasiticSpeedFlap'])  # value for parasitic drag coeffcient when in speed flap mode
-    cdParasiticStartFlap = float(planeParameters['cdParasiticStartFlap'])  # value for parasitic drag coeffcient when in speed flap mode
-    clAlphaCoeff = float(planeParameters['clAlphaCoeff'])                  # Reduction of clAlpha from 2*pi
-    maxLoadFactor = float(planeParameters['maxLoadFactor'])
-    speedFlapCl0  = float(planeParameters['speedFlapCl0'])
-    startFlapCl0 = float(planeParameters['startFlapCl0'])
+    refRe = float(paraMeterArray['refRe'])
+    cdInference = float(paraMeterArray['cdInference'])                    # Interfernece cd factor
+    cdInducedFactor = float(paraMeterArray['cdInducedFactor'])            # Addition of cd induced factor
+    cdParasiticSpeedFlap = float(paraMeterArray['cdParasiticSpeedFlap'])  # value for parasitic drag coeffcient when in speed flap mode
+    cdParasiticStartFlap = float(paraMeterArray['cdParasiticStartFlap'])  # value for parasitic drag coeffcient when in speed flap mode
+    clAlphaCoeff = float(paraMeterArray['clAlphaCoeff'])                  # Reduction of clAlpha from 2*pi
+    maxLoadFactor = float(paraMeterArray['maxLoadFactor'])
+    speedFlapCl0  = float(paraMeterArray['speedFlapCl0'])
+    startFlapCl0 = float(paraMeterArray['startFlapCl0'])
 
     # Not implemented...
-    ReCoeff = float(planeParameters['ReCoeff'])
+    ReCoeff = float(paraMeterArray['ReCoeff'])
     Re = float(150000)
 
 
@@ -142,33 +152,33 @@ def reset(planeParameters,flightParameters,winchParameters,lineParameters,flighC
     """
     ******************** Flight parameters ********************************
     """
-    speedFlapPos = float(flightParameters['speedFlapPos'])
-    startFlapPos = float(flightParameters['startFlapPos'])
+    speedFlapPos = float(paraMeterArray['speedFlapPos'])
+    startFlapPos = float(paraMeterArray['startFlapPos'])
 
     """
     ******** LAUNCHCONFIGURATION IN PHASE 0*****************************
     """
     # Preforce applied to the wire [N]
-    preTensionOfLine = float(flightParameters['preTensionOfLine'])
+    preTensionOfLine = float(paraMeterArray['preTensionOfLine'])
 
     """
     ******** LAUNCHCONFIGURATION IN PHASE 1, in alt2 mode used as init...
     """
     # Takeoff speed [m/s]
-    takeOffSpeed = float(flightParameters['takeOffSpeed'])
+    takeOffSpeed = float(paraMeterArray['takeOffSpeed'])
 
     # Launch angle [deg]
-    gamma0 = float(flightParameters['launchAngle'])
+    gamma0 = float(paraMeterArray['launchAngle'])
 
     # Rate of gamma change [deg/s]. A maximal value of which the gamma
     # can change per second. Used to limit the turn rate
-    gammaR0 = float(flightParameters['gammaR0'])
+    gammaR0 = float(paraMeterArray['gammaR0'])
 
     """
     ******** LAUNCHCONFIGURATION IN PHASE 2*****************************
     """
-    setpointAOA = float(flightParameters['setpointAOA'])
-    flapPosPhase2 = float(flightParameters['startFlapPos'])
+    setpointAOA = float(paraMeterArray['setpointAOA'])
+    flapPosPhase2 = float(paraMeterArray['startFlapPos'])
 
 
     """
@@ -176,10 +186,10 @@ def reset(planeParameters,flightParameters,winchParameters,lineParameters,flighC
     """
     # Rate of gamma change [deg/s]. A maximal value of which the gamma
     # can change per second. Used to limit the turn rate
-    gammaR1 = float(flightParameters['gammaR1'])
-    diveStartAngle = float(flightParameters['diveStartAngle'])
+    gammaR1 = float(paraMeterArray['gammaR1'])
+    diveStartAngle = float(paraMeterArray['diveStartAngle'])
 
-    flapPosPhase3 = float(flightParameters['speedFlapPos'])
+    flapPosPhase3 = float(paraMeterArray['speedFlapPos'])
 
 
     """
@@ -187,46 +197,46 @@ def reset(planeParameters,flightParameters,winchParameters,lineParameters,flighC
     """
     # Rate of gamma change [deg/s]. A maximal value of which the gamma
     # can change per second. Used to limit the turn rate
-    gammaR2 = float(flightParameters['gammaR2'])
-    flapPosPhase4 = float(flightParameters['speedFlapPos'])
-    climbAngle = float(flightParameters['climbAngle'])
+    gammaR2 = float(paraMeterArray['gammaR2'])
+    flapPosPhase4 = float(paraMeterArray['speedFlapPos'])
+    climbAngle = float(paraMeterArray['climbAngle'])
 
 
     """
     ******** LAUNCHCONFIGURATION IN PHASE 5 *****************************
     """
-    flapPosPhase5 = float(flightParameters['thermicFlapPos'])
+    flapPosPhase5 = float(paraMeterArray['thermicFlapPos'])
     vMinMy = float(velocityMin(flapPosPhase5))
     # Rate of gamma change [deg/s]. A maximal value of which the gamma
     # can change per second. Used to limit the turn rate
-    gammaR3 = float(flightParameters['gammaR3'])
+    gammaR3 = float(paraMeterArray['gammaR3'])
 
     """
     ********* WINCH PARAMETERS ********************************
     """
     # Winch Stall torque - Torque at zero speed [Nm]
-    wst = float(winchParameters['winchStallTorque'])
+    wst = float(paraMeterArray['winchStallTorque'])
 
     # Winch zero torque speed  - Speed where the winch has no torque[rad/s]
-    wzs = radPerS(float(winchParameters['winchZeroSpeed']))
+    wzs = radPerS(float(paraMeterArray['winchZeroSpeed']))
 
     # Diameter of the cylinger collecting the wire [m]
-    drumDiameter=float(winchParameters['drumDiameter'])
+    drumDiameter=float(paraMeterArray['drumDiameter'])
 
     # Distance between the winch and the pulley. The plane is assumed to start
     # at the same location as the winch [m]
-    distanceToPulley = float(winchParameters['distanceToPulley'])
+    distanceToPulley = float(paraMeterArray['distanceToPulley'])
 
     # Length of winch drum
-    drumLength = float(winchParameters['drumLength'])
+    drumLength = float(paraMeterArray['drumLength'])
 
     """
     ********* LINE PARAMETERS ********************************
     """
 
      # Diameter of the line [m]
-    lineDiameter = float(lineParameters['lineDiameter'])
-    totalLineLength  = float(lineParameters['totalLineLength'])
+    lineDiameter = float(paraMeterArray['lineDiameter'])
+    totalLineLength  = float(paraMeterArray['totalLineLength'])
 
     """
     Some Different E values:
@@ -234,10 +244,10 @@ def reset(planeParameters,flightParameters,winchParameters,lineParameters,flighC
         Rubber 0.01e9-0.1e9
         Nylon 2e9-4e9
     """
-    EModule    =  float(lineParameters['EModule'])
-    lineDragCoeffsient = float(lineParameters['lineDragCoeffsient'])
-    parachuteDragCoeffcient = float(lineParameters['parachuteDragCoeffcient'])
-    parachuteArea = float(lineParameters['parachuteArea'])
+    EModule    =  float(paraMeterArray['EModule'])
+    lineDragCoeffsient = float(paraMeterArray['lineDragCoeffsient'])
+    parachuteDragCoeffcient = float(paraMeterArray['parachuteDragCoeffcient'])
+    parachuteArea = float(paraMeterArray['parachuteArea'])
 
 
     """
@@ -245,19 +255,21 @@ def reset(planeParameters,flightParameters,winchParameters,lineParameters,flighC
     Not fully implemented yet
     """
     # The headwind meassured at 2 meters height, m/s
-    windSpeed = float(flighConditionsParameters['windSpeed'])
+    windSpeed = float(paraMeterArray['windSpeed'])
 
     # The thermic upwind speed component, m/s
-    thermic = float(flighConditionsParameters['thermic'])
+    thermic = float(paraMeterArray['thermic'])
 
     # where the thermic wind ceils, or where it is known,
     # its intrepated linear up to this height
-    thermicCeil = float(flighConditionsParameters['thermicCeil'])
+    thermicCeil = float(paraMeterArray['thermicCeil'])
 
-    tempAtGround = float(flighConditionsParameters['temperatureAtGround'])+273.15
-    pressureAtGround = float(flighConditionsParameters['pressureAtGround'])
-    humidity = float(flighConditionsParameters['humidity'])
+    tempAtGround = float(paraMeterArray['temperatureAtGround'])+273.15
+    pressureAtGround = float(paraMeterArray['pressureAtGround'])
+    humidity = float(paraMeterArray['humidity'])
 
+    initSim()
+    loggingReset()
 
 
 def initSim():
@@ -583,7 +595,7 @@ def simulate(inp):
     """
     Runs the simulation
     """
-    #reset()
+    reset()
     teller = 0
     heightPhase = [0.0]
     counterPhase = [0]
@@ -648,7 +660,7 @@ def simulate(inp):
             print "x:",_x[-1],"y:",_y[-1]
 
     heightPhase.append(_y[-1])
-    return heightPhase
+    return heightPhase[2:-1]
 
 ##
 ##    if max(E)==0:
@@ -659,53 +671,9 @@ def simulate(inp):
 
 
 
-
-def sensitivityPlane(refHeight):
-    global planeParameters
-    planeParameters = planeParameters0.copy()
-
-    #refHeight = simulate([0])
-    print refHeight
-    svarMin = [refHeight]
-    svarMax = [refHeight]
-    senstivityArrayPlane = [0]
-    keysPlane = ["Ref"]
-
-
-
-    for key, value in planeParameters0.items():
-        value = planeParameters0[key]
-        refValue = value
-        planeParameters[key] = value*.9
-        minVal = planeParameters[key]
-        minRes = simulate([0])
-
-        value = planeParameters0[key]
-        planeParameters[key] = value*1.1
-        maxVal = planeParameters[key]
-        maxRes = simulate([0])
-
-        svarMin.append(minRes)
-        svarMax.append(maxRes)
-        keysPlane.append(key)
-
-        senstivityArrayPlane.append(abs(svarMax[-1]-svarMin[-1])/refHeight)
-
-        if abs(svarMin[-1]-svarMax[-1])<0.01:
-            print key, " mostly liked to be not impmented"
-        if abs(abs(svarMin[-1]-refHeight) - abs(svarMax[-1]-refHeight))>0.5:
-            print key, " is not linear, asymmetric"
-
-        print key, "Ref:",refValue," -- ", refHeight, " Min: ",minVal," -- " ,minRes,"Max: ",maxVal," -- ", maxRes
-
-    totalSum = sum(senstivityArrayPlane)
-    for i in range(1,len(senstivityArrayPlane)):
-        prosent = senstivityArrayPlane[i]/totalSum*100
-        print keysPlane[i], prosent
-
 def sensitivityCheck(changeArray0):
-
-    changeArray = changeArray0.copy()
+    global paraMeterArray
+##    paraMeterArray = changeArray0.copy()
 
 
     keys   = []
@@ -715,13 +683,13 @@ def sensitivityCheck(changeArray0):
     maxRes = []
 
     for key, value in changeArray0.items():
-        changeArray[key] = value*.9
-        minVal.append(changeArray[key])
-        minRes.append(simulateTemp(changeArray))
+        paraMeterArray[key] = value*.9
+        minVal.append(paraMeterArray[key])
+        minRes.append(simulate(paraMeterArray))
 
-        changeArray[key] = value*1.1
-        maxVal.append(changeArray[key])
-        maxRes.append(simulateTemp(changeArray))
+        paraMeterArray[key] = value*1.1
+        maxVal.append(paraMeterArray[key])
+        maxRes.append(simulate(paraMeterArray))
         keys.append(key)
 
     return keys,minVal,maxVal,minRes,maxRes
@@ -750,11 +718,20 @@ def simulateTemp(inp):
 
     return [float(randint(130,160)),float(randint(100,130)),float(randint(200,260))]
 
-def sensitivity(refHeight):
-    global planeParameters0,planeParameters
-    sensitivity2(refHeight,planeParameters,planeParameters0)
-    sensitivityPlane(refHeight)
-    sensitivityFlight(refHeight)
+def sensitivity():
+    global paraMeterArray
+    paraMeterArray,planeParameters,flightParameters,winchParameters,lineParameters,flighConditionsParameters = init()
+    reset()
+    loggingReset()
+    testArray = paraMeterArray.copy()
+    tempArray = {'wingSpan':3,
+                'wingLoading':3.5}
+    keys,minVal,maxVal,minRes,maxRes = sensitivityCheck(testArray)
+    sensitivityMy = sensitivityDelta(keys,minVal,maxVal,minRes,maxRes)
+
+
+    plotSensitivity(sensitivityMy,keys,1,1,1)
+    printSensitivity(keys,minVal,maxVal,minRes,maxRes)
 
 if __name__=="__main__":
 
@@ -764,13 +741,16 @@ if __name__=="__main__":
 ##    refHeight = simulate([0])
 ##    plotSim(1)
     print "Start!!!!"
-    planeParameters,flightParameters,winchParameters,lineParameters,flighConditionsParameters = init()
-    reset(planeParameters,flightParameters,winchParameters,lineParameters,flighConditionsParameters)
-    loggingReset()
-    print simulate([3])
-    initPlot(_x,_y,counterPhase)
-    plotXY(1,1)
+##    planeParameters,flightParameters,winchParameters,lineParameters,flighConditionsParameters = init()
+##    reset(planeParameters,flightParameters,winchParameters,lineParameters,flighConditionsParameters)
+##    loggingReset()
+##    print simulate([3])
+##    initPlot(_x,_y,counterPhase)
+##    plotXY(1,1)
 
+
+
+    sensitivity()
     #sensitivity(runInit(0))
     print "Done!!!!"
 
