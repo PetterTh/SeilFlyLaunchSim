@@ -15,7 +15,7 @@ from selFunc import *
 
 
 
-def plotSensitivity(sensitivity,keys,exploded,showMy,save):
+def plotSensitivity(sensitivity,keys,exploded,showOn,saveOn):
 ##    pie(sensitivity, explode=None, labels=keys)
 
 
@@ -34,5 +34,11 @@ def plotSensitivity(sensitivity,keys,exploded,showMy,save):
         ax = axes([0.1, 0.1, 0.8, 0.8])
         pie(sensitivityCol,explode=explodedMy, labels=keys)
         setFigureNumber()
-    show()
+
+        if showOn:
+            show()
+        if saveOn:
+            myString = getDateString()
+            saveFigMy()
+            savefig('Figures/' + myString + '.png')
 

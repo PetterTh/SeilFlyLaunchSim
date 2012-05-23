@@ -37,7 +37,9 @@ def test():
     print densityWithHumidity(0,p0,T0,y)
 
 
-
+def test3():
+    print getDateString()
 
 if __name__ == '__main__':
-    testSensitivity()
+    #testSensitivity()
+    test3()

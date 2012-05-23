@@ -9,6 +9,7 @@
 # Licence:     <your licence>
 #-------------------------------------------------------------------------------
 from selFunc import *
+import numpy as np
 
 def Swinch(_lineForce,_drumDiameter,_winchStallTorque,_winchZeroSpeed,
         _momentOnWinchDrum,_dt):
@@ -63,19 +64,6 @@ def lineForce(_phase,_lineForceOld,_deltaLineForce):
     else:
         return max(0,(_lineForceOld+_deltaLineForce))
 
-##def lineForce(phase,lineForce,drumDiameter,winchStallTorque,
-##            winchZeroSpeed,momentOnWinchDrum,lineLengthOld,x,y,L0,
-##            E,lineDiameter):
-##    """
-##    Returns the force in the line
-##    dF=(dL+winchspeed)/k
-##    """
-##    if phase == 4:
-##        return 0
-##    else:
-##        return max(0,lineForce+(deltaLineLength(lineLengthOld,x,y,L0)
-##                +Swinch(lineForce,drumDiameter,winchStallTorque,winchZeroSpeed,
-##                momentOnWinchDrum))/lineLength(x,y,L0)*kLine(E,lineDiameter))
 
 def deltaLineLength(lineLengthOld,x,y,L0):
     return lineLength(x,y,L0)-lineLengthOld

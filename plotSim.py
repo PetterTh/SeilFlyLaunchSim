@@ -10,29 +10,37 @@
 #-------------------------------------------------------------------------------
 import numpy as np
 from pylab import *
-import SeilSim as ss
+from selFunc import *
 
-def initPlot(_x,_y,_counterPhase):
+
+def initPlot(logg):
     global x,y,counterPhase,colors
+
     colors = ["r","b","m","y","black","o"]
-    x = _x
-    y = _y
+    counterPhase = logg['counterPhase']
+    x = logg['x']
+    y =logg['y']
     counterPhase = _counterPhase
 
 def plotXY(showOn,saveOn):
     figure(1)
     grid()
 
-##    for index in range(0,len(counterPhase)-1):
-##       plot(x[counterPhase[index]:counterPhase[index+1]],y[counterPhase[index]:counterPhase[index+1]],colors[index])
-    plot(x,y)
+    for index in range(0,len(counterPhase)-1):
+       plot(x[counterPhase[index]:counterPhase[index+1]],y[counterPhase[index]:counterPhase[index+1]],colors[index])
+
+    #plot(x,y)
+
     xlabel("X-Position [m]")
     ylabel("Y-Position [m]")
 
     if showOn:
         show()
     if saveOn:
-        savefig('Figures/fig1.png')
+        myString = getDateString()
+        saveFigMy()
+        savefig('Figures/' + myString + '.png')
+
 
 def plotSim(save,plotOn):
     """

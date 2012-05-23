@@ -10,7 +10,14 @@
 #-------------------------------------------------------------------------------
 
 import numpy as np
+import re
+from datetime import datetime
+#from pylab import *
+
+
 figureNumber = 1
+paraMeterArray = {}
+
 def deg(a):
     """
     Returns the argument in degrees
@@ -81,3 +88,41 @@ def setFigureNumber():
 
 def getFigureNumber():
     return figureNumber
+
+def getDateString():
+    collection= datetime.now()
+    myString = collection.isoformat() #collection.year + collection.month +collection.day
+    myString = re.sub("\:", "-", myString)
+    myString = re.sub("\.", "MS", myString)
+    return myString
+
+def writeDict(_dictonary,_fileName):
+    f = open(_fileName,'w')
+    temp = str(_dictonary)
+    temp = re.sub(",", "\n", temp)
+    f.write(str(temp))
+    f.close()
+
+def readDict(_dictonary,_fileName):
+    f = open(_fileName,'r')
+    my_dict = eval1(f.read())
+    f.close()
+
+def eval1(x):
+    try: return eval(x)
+    except: return x
+    A = { eval1(y[0]) : eval1(y[1]) for y in [x.split() for x in open(filename).readlines()] }
+
+def getParametersArray():
+    return paraMeterArray
+
+def setParametersArray(paraMeterArray0):
+    global paraMeterArray
+    paraMeterArray = paraMeterArray0
+
+def saveFigMy():
+    _dictonary = getParametersArray()
+    myString = getDateString()
+    #savefig('Figures/' + myString + '.png')
+    writeDict(_dictonary,'Figures/' + myString + '.txt')
+
