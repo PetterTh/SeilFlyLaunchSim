@@ -13,26 +13,35 @@ from pylab import *
 from selFunc import *
 
 
-def initPlot(logg):
-    global x,y,counterPhase,colors
+def initPlot(_logg,_counterPhase):
+    global logg,counterPhase,colors
 
     colors = ["r","b","m","y","black","o"]
-    counterPhase = logg['counterPhase']
-    x = logg['x']
-    y =logg['y']
+    logg = _logg
     counterPhase = _counterPhase
 
 def plotXY(showOn,saveOn):
-    figure(1)
-    grid()
 
-    for index in range(0,len(counterPhase)-1):
-       plot(x[counterPhase[index]:counterPhase[index+1]],y[counterPhase[index]:counterPhase[index+1]],colors[index])
+    grid()
+    x= logg['x']
+    teller = 1
+    for key, value in logg.items():
+        #if key!='x'
+        figure(teller)
+        print key
+        for index in range(0,len(counterPhase)-1):
+            plot(x[counterPhase[index]:counterPhase[index+1]],value[counterPhase[index]:counterPhase[index+1]],colors[index])
+            xlabel("X-Position [m]")
+            ylabel(key)
+            title(key)
+        myString = getDateString()
+        saveFigMy()
+        savefig('Figures/' + myString + '.png')
+        teller = teller +1
 
     #plot(x,y)
 
-    xlabel("X-Position [m]")
-    ylabel("Y-Position [m]")
+
 
     if showOn:
         show()

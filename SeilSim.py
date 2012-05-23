@@ -504,7 +504,7 @@ def sumForces():
     _fx.append(-_fDrag[-1]*np.cos(rad(_velAng[-1]))+_lineForce[-1]*np.cos(rad(_psi[-1]))-_fLift[-1]*np.sin(rad(_velAng[-1])))
     _fy.append(-_fDrag[-1]*np.sin(rad(_velAng[-1]))-_lineForce[-1]*np.sin(rad(_psi[-1]))+_fLift[-1]*np.cos(rad(_velAng[-1]))- gravityForce)
 
-
+    _drumDiameter.append(_drumDiameter[-1])
 
 
 ##        clVal.append(calcCl())
@@ -735,27 +735,45 @@ def plotMy():
     global paraMeterArray
     paraMeterArray = init()
     print simulate([3])
-    initPlot(saveLogg())
+    initPlot(saveLogg(),counterPhase)
     plotXY(0,1)
 
 
 def saveLogg():
-    basicLogg = {'y' :_y,
-                'velocity':_velocity,
-                'lineForce':_lineForce,
-                'energy':_E,
-                }
+##    basicLogg = {'y' :_y,
+##                'velocity':_velocity,
+##                'lineForce':_lineForce,
+##                'energy':E,
+##                }
 
-    loggArray = {'x':_x,
-            'ax':_ax,
-            'ay':_ay,
-            'vx':_u,
-            'vy':_v,
-            'x':_x,
-            'y':_y,
-            'fx':_fx,
-            'fy':_fy,
-            'counterPhase':counterPhase}
+    loggArray = {'u':_u,
+                'v':_v,
+                'x':_x,
+                'y':_y,
+                'ax':_ax,
+                'ay':_ay,
+                'attAng':_attAng,
+                'velAng':_velAng,
+                'psi':_psi,
+                'gamma':_gamma,
+                'flapPos':_flapPos,
+                'lineLengthToPlane':_lineLengthToPlane,
+                'velocity':_velocity,
+                'rho':_rho,
+                'clTotal':_clTotal,
+                'cdTotal':_cdTotal,
+                'fDrag':_fDrag,
+                'fLift':_fLift,
+                'lineForce':_lineForce,
+                'lineDiameter':_lineDiameter,
+                'kLine':_kLine,
+                'fx':_fx,
+                'fy':_fy,
+                'T':T,
+                'E':E,
+                'drumDiameter':_drumDiameter,
+                'momentOnWinchDrum':_momentOnWinchDrum,
+                'lineOnWinch':_lineOnWinch}
 
     return loggArray
 
@@ -769,8 +787,8 @@ if __name__=="__main__":
 ##    plotSim(1)
     print "Start!!!!"
 
-    #plotMy()
-    testVary()
+    plotMy()
+    #testVary()
 
     #sensitivity()
 
