@@ -59,7 +59,7 @@ def lineForce(_phase,_lineForceOld,_deltaLineForce):
     Returns the force in the line
     dF=(dL+winchspeed)/k
     """
-    if _phase == 4:
+    if _phase >= 4:
         return 0
     else:
         return max(0,(_lineForceOld+_deltaLineForce))
@@ -68,8 +68,11 @@ def lineForce(_phase,_lineForceOld,_deltaLineForce):
 def deltaLineLength(lineLengthOld,x,y,L0):
     return lineLength(x,y,L0)-lineLengthOld
 
-def lineDiameter():
-    return 1.4e-3
+def lineDiameter(phase,D0,l0,deltaL):
+    if phase >= 4:
+        return D0
+    else:
+        return np.sqrt(l0/(l0+deltaL))*D0
 
 def diameter():
     global drumDiameter,layersOnDrum

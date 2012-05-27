@@ -3,15 +3,34 @@ from scipy import optimize
 from math import *
 from pylab import *
 from random import *
+#from numarray import *
 
 from Lnd import *
 from selFunc import *
 from winch import *
 from plotSim import *
 from plotSensitivity import *
+from plotSelector import *
 
 paraMeterArray = {}
-
+saveOn= 1
+showOn = 1
+plotVer = 0
+"""
+    0: All available plot methods
+    1: x,y plot
+    2: x,plotkey
+    3: x, all pararmeters in logg array
+    4: x, plotKeyArray
+    5: plotKey, height
+    6: all pararmeters in paraMeterArray, height
+"""
+plotKey = 'lineDiameter'
+#plotKey = 'wingSpan'
+plotKeyArray = ['lineDiameter','totalLineLength']
+#plotKeyArray = ['lineDiameter','deltaLineLength','totalLineLength']
+scalePlot = 1000
+numbersOfVariationStepForPlots = 3
 # Some global parameters
 
 def init():
@@ -64,7 +83,7 @@ def init():
     lineParameters0 =           {'lineDiameter':1.4e-3,
                                 'totalLineLength':400,
                                 'EModule':2e9,
-                                'lineDragCoeffsient':1.3,
+                                'lineDragCoeffsient':0.69,
                                 'parachuteDragCoeffcient':3,
                                 'parachuteArea':0.2};
 
@@ -113,7 +132,7 @@ def reset():
     global humidity,pressureAtGround,tempAtGround,windSpeed,thermic,thermicCeil
 
     #Line parameters
-    global totalLineLength,EModule
+    global totalLineLength,EModule,lineDiameterMy
 
     #Winch parameters
     global distanceToPulley,drumDiameter,wzs,wst,_lineOnWinch
@@ -244,7 +263,7 @@ def reset():
     """
 
      # Diameter of the line [m]
-    lineDiameter = float(paraMeterArray['lineDiameter'])
+    lineDiameterMy = float(paraMeterArray['lineDiameter'])
     totalLineLength  = float(paraMeterArray['totalLineLength'])
 
     """
@@ -319,52 +338,59 @@ def loggingReset():
     global _u,_v,_x,_y,_ax,_ay
     global _attAng,_velAng,_psi,_gamma
     global _flapPos
-    global _lineLengthToPlane,_velocity,_rho,_clTotal,_cdTotal,_fDrag,_fLift
+    global _totalLineLength,_velocity,_rho,_clTotal,_cdTotal,_fDrag,_fLift
     global _lineForce,_lineDiameter,_kLine,_fx,_fy
     global E,T
-    global _drumDiameter,_momentOnWinchDrum,_lineOnWinch
+    global _drumDiameter,_momentOnWinchDrum,_lineOnWinch,_lengthToPlaneFromPulley
+    global _lineArea,_lineDrag,_fTotalDrag,_deltaLineLength
 
     # All arrays can be zero since we start with preloading the wire in time step 0,
     # except of x,k,lineDiameter,drumDiameter,total Line Length which is set to init valiues
 
     # Logging arrays.......
-    _flapPos = [0]
-    _clTotal = [0]
-    _cdTotal = [0]
+    _flapPos = [0.0]
+    _clTotal = [0.0]
+    _cdTotal = [0.0]
 
-    _velocity = [0] # Apperent velocity
+    _velocity = [0.0] # Apperent velocity
     _x   = [-distanceToPulley]# Positon of the plane in x direction [m]
     _y   = [0.0]# Position of the plane in y direction [m]
     _ax = [0.0]# Acceleration of the plane in x direction [m]
     _ay = [0.0]# Acceleration of the plane in y direction [m]
     _u   = [0.0]      # Plane velocity in x direction [m/s]
     _v   = [0.0]      # Plane velocity in y direction [m/s]
-    _fx = [0]
-    _fy = [0]
-    _lineLengthToPlane    = [totalLineLength] # Length of the line between the winch and the plane [m]
-    _lineOnWinch    = [0]# Meters of line on the winch [m]
-    _lineForce  = [0] # Lineforce [N]
+    _fx = [0.0]
+    _fy = [0.0]
+    _totalLineLength    = [totalLineLength] # Length of the line between the winch and the plane [m]
+    _deltaLineLength =[0.0]
+    _lineOnWinch    = [0.0]# Meters of line on the winch [m]
+    _lineForce  = [0.0] # Lineforce [N]
     _drumDiameter = [drumDiameter]
 
     # angles
     _psi = [0.0]          # Angle between line and ground [deg]
-    _gamma = [0]   # Angle between plane and ground [deg]
-    _attAng = [0]       # Angle of attack [deg]
-    _velAng = [0]       # The planes velocity angle [deg]
+    _gamma = [0.0]   # Angle between plane and ground [deg]
+    _attAng = [0.0]       # Angle of attack [deg]
+    _velAng = [0.0]       # The planes velocity angle [deg]
     T  = [0.0]         # Accumulated time [s]
-    omega = [0]        # Speed of the winch [rad/s]
-    E = [0]            # Total energy of the plane [J]
-    rpm = [0]          # speed of winch[rpm]
+    omega = [0.0]        # Speed of the winch [rad/s]
+    E = [0.0]            # Total energy of the plane [J]
+    rpm = [0.0]          # speed of winch[rpm]
     _momentOnWinchDrum = [0] # moment on winch cylinder [Nm]
-    cdiVal = [0] #induced drag coefficient
-    clVal  = [0] #lift coeffcient
-    cdVal = [0] #drag coefficient
-    loadFactor = [0] # loadfactor
-    _lineDiameter = [lineDiameter()]
+    cdiVal = [0.0] #induced drag coefficient
+    clVal  = [0.0] #lift coeffcient
+    cdVal = [0.0] #drag coefficient
+    loadFactor = [0.0] # loadfactor
+    _lineDiameter = [lineDiameterMy]
     _kLine = [kLine(EModule,_lineDiameter[-1])]
     _rho = [densityWithHumidity(humidity,pressureAtGround,tempAtGround,_y[-1])]# Airdensity [kg/m3]
     _fDrag = [0.0]
     _fLift = [0.0]
+    _lengthToPlaneFromPulley = [distanceToPulley]
+    _lineArea = [lineArea(_lineDiameter[-1],_lengthToPlaneFromPulley[-1],_gamma[-1])]
+    _lineDrag = [0.0]
+    _fTotalDrag = [0.0]
+
 
 
 def calcVelAng():
@@ -461,8 +487,9 @@ def sumForces():
     """
     Calculates the resulting forces acting on the plane
     """
-    global _lineLengthToPlane,_velocity,_rho,_clTotal,_cdTotal,_fDrag,_fLift
+    global _totalLineLength,_velocity,_rho,_clTotal,_cdTotal,_fDrag,_fLift
     global _lineForce,_fx,_fy,_kLine,_lineDiameter,_lineOnWinch
+    global _lengthToPlaneFromPulley,_lineArea,_lineDrag,_fTotalDrag,_deltaLineLength
 
     _velocity.append( sqrt((_u[-1]+ windSpeed)**2+ (_v[-1])**2))
     _rho.append(densityWithHumidity(humidity,pressureAtGround,tempAtGround,_y[-1]))
@@ -475,36 +502,55 @@ def sumForces():
 
     _clTotal.append(calcCl(_attAng[-1],clAlphaCoeff,speedFlapPos,startFlapPos,speedFlapCl0,startFlapCl0,_flapPos[-1]))
     _cdTotal.append(calcCd(AR,cdInducedFactor,_clTotal[-1],cdParasiticSpeedFlap,cdParasiticStartFlap,speedFlapPos,startFlapPos,_flapPos[-1],Re,refRe,ReCoeff,cdInference))
+    cdLineMy = cdLine()
 
+    if onLine:
+        _totalLineLength.append(lineLength(_x[-1],_y[-1],distanceToPulley))
+
+        _momentOnWinchDrum.append(momentOnWinchDrum(_lineForce[-1],_drumDiameter[-1]))
+        s = Swinch(_lineForce[-1],_drumDiameter[-1],wst,wzs,_momentOnWinchDrum[-1],dt)
+        _lineOnWinch.append(_lineOnWinch[-1]+s)
+
+        _deltaLineLength.append(_totalLineLength[-1]-_totalLineLength[-2] + s)
+
+        _lineDiameter.append(lineDiameter(phase,lineDiameterMy,_totalLineLength[-1],_deltaLineLength[-1]))
+        _kLine.append(kLine(EModule,_lineDiameter[-1]))
+        deltaLineForceMy = deltaLineForce(_totalLineLength[-1],_deltaLineLength[-1],_kLine[-1])
+
+        _lineForce.append(lineForce(phase,_lineForce[-1],deltaLineForceMy))
+        _drumDiameter.append(_drumDiameter[-1])
+
+
+        _lengthToPlaneFromPulley.append(lengthToPlaneFromPulley(_x[-1],_y[-1]))
+        _lineArea.append(lineArea(_lineDiameter[-1],_lengthToPlaneFromPulley[-1],_gamma[-1]))
+    else:
+        _totalLineLength.append(_totalLineLength[-1])
+        _momentOnWinchDrum.append(0.0)
+        _lineOnWinch.append(_lineOnWinch[-1])
+        _deltaLineLength.append(0.0)
+        _lineDiameter.append(lineDiameterMy)
+        _kLine.append(_kLine[-1])
+        _lineForce.append(_lineForce[-1])
+        _drumDiameter.append(_drumDiameter[-1])
+        _lengthToPlaneFromPulley.append(lengthToPlaneFromPulley(_x[-1],_y[-1]))
+        _lineArea.append(_lineArea[-1])
 
     if phase>0:
         gravityForce = g()*pm
         _fDrag.append(Fdrag(_cdTotal[-1],_velocity[-1],_rho[-1],wingArea))
         _fLift.append(Flift(_clTotal[-1],_velocity[-1],_rho[-1],wingArea))
+        _lineDrag.append(FlineDrag(cdLineMy,_velocity[-1],_rho[-1],_lineArea[-1],phase))
     else:
         _fDrag.append(0)
         _fLift.append(0)
+        _lineDrag.append(0)
         gravityForce = 0
 
-
-    _lineLengthToPlane.append(lineLength(_x[-1],_y[-1],distanceToPulley))
-    _lineDiameter.append(lineDiameter())
-    _kLine.append(kLine(EModule,_lineDiameter[-1]))
-    _momentOnWinchDrum.append(momentOnWinchDrum(_lineForce[-1],_drumDiameter[-1]))
-    s = Swinch(_lineForce[-1],_drumDiameter[-1],wst,wzs,_momentOnWinchDrum[-1],dt)
-    _lineOnWinch.append(_lineOnWinch[-1]+s)
-
-    deltaLineLengthMy = _lineLengthToPlane[-1]-_lineLengthToPlane[-2] + s
-    deltaLineForceMy = deltaLineForce(_lineLengthToPlane[-1],deltaLineLengthMy,_kLine[-1])
-
-    _lineForce.append(lineForce(phase,_lineForce[-1],deltaLineForceMy))
+    _fTotalDrag.append(_fDrag[-1] + _lineDrag[-1])
+    _fx.append(-_fTotalDrag[-1]*np.cos(rad(_velAng[-1]))+_lineForce[-1]*np.cos(rad(_psi[-1]))-_fLift[-1]*np.sin(rad(_velAng[-1])))
+    _fy.append(-_fTotalDrag[-1]*np.sin(rad(_velAng[-1]))-_lineForce[-1]*np.sin(rad(_psi[-1]))+_fLift[-1]*np.cos(rad(_velAng[-1]))- gravityForce)
 
 
-
-    _fx.append(-_fDrag[-1]*np.cos(rad(_velAng[-1]))+_lineForce[-1]*np.cos(rad(_psi[-1]))-_fLift[-1]*np.sin(rad(_velAng[-1])))
-    _fy.append(-_fDrag[-1]*np.sin(rad(_velAng[-1]))-_lineForce[-1]*np.sin(rad(_psi[-1]))+_fLift[-1]*np.cos(rad(_velAng[-1]))- gravityForce)
-
-    _drumDiameter.append(_drumDiameter[-1])
 
 
 ##        clVal.append(calcCl())
@@ -558,16 +604,18 @@ def simulate(inp):
     global _flapPos,dt
     global T,E
     global AR,cdInducedFactor,clTotal,cdParasiticSpeedFlap,cdParasiticStartFlap,flapPos,Re,refRe,ReCoeff,cdInference
-    global phase,counterPhase,heightPhase
+    global phase,counterPhase,heightPhase,onLine,paraMeterArray
 
     """
     Runs the simulation
     """
+    paraMeterArray = inp
     reset()
     teller = 0
     heightPhase = [0.0]
     counterPhase = [0]
     change = 0
+    onLine = 1
     while T[-1]<=Tmax and _y[-1] >= -10.0 and phase<5:
 
         _flapPos.append(flapPosPhase[phase])
@@ -614,7 +662,7 @@ def simulate(inp):
                 print "diveHeight reached"
             if _lineForce[-1]==0:
                 print "all lineForce used" ,heightPhase[-1]-_y[-1]
-
+            onLine = 0
 
         if _velocity[-1]<vMinMy and phase>3:
             phase = 5
@@ -647,43 +695,6 @@ def simulate(inp):
 
 
 
-def sensitivityCheck(changeArray0):
-    global paraMeterArray
-
-    keys   = []
-    minVal = []
-    maxVal = []
-    minRes = []
-    maxRes = []
-
-    for key, value in changeArray0.items():
-        paraMeterArray[key] = value*.9
-        minVal.append(paraMeterArray[key])
-        minRes.append(simulate(paraMeterArray))
-
-        paraMeterArray[key] = value*1.1
-        maxVal.append(paraMeterArray[key])
-        maxRes.append(simulate(paraMeterArray))
-        keys.append(key)
-
-    return keys,minVal,maxVal,minRes,maxRes
-
-def sensitivityDelta(keys,minVal,maxVal,minRes,maxRes):
-
-    maxValues = max(max(minRes),max(maxRes))
-
-    senstivityArrayTemp= (abs(subtract(minRes,maxRes))/maxValues)
-    summOfArray = senstivityArrayTemp.sum(axis=0)
-
-    return senstivityArrayTemp/summOfArray
-
-def printSensitivity(keys,minVal,maxVal,minRes,maxRes):
-
-    sentivity = sensitivityDelta(keys,minVal,maxVal,minRes,maxRes)*100
-    print "Parameter    Height2 Height3 Height5 Min Val Max Val "
-
-    for i in range(0,len(sentivity)):
-        print keys[i],sentivity[i],"%",minVal[i],maxVal[i]
 
 
 
@@ -692,51 +703,7 @@ def simulateTemp(inp):
 
     return [float(randint(130,160)),float(randint(100,130)),float(randint(200,260))]
 
-def sensitivity():
-    global paraMeterArray
-    #planeParameters0,flightParameters0, winchParameters0,lineParameters0,flighConditionsParameters0
-    paraMeterArray = init()
-    testArray = paraMeterArray.copy()
-    tempArray = {'wingSpan':3,
-                'wingLoading':3.5}
-    keys,minVal,maxVal,minRes,maxRes = sensitivityCheck(testArray)
-    sensitivityMy = sensitivityDelta(keys,minVal,maxVal,minRes,maxRes)
-    plotSensitivity(sensitivityMy,keys,1,1,1)
-    printSensitivity(keys,minVal,maxVal,minRes,maxRes)
 
-def varyVariabel(key,startValue,stopValue,numbers):
-    global paraMeterArray
-    paraMeterArray = init()
-    stepSize = int(round(float(stopValue-startValue)/numbers))
-    x = []
-    y = []
-    for i in range(startValue,stopValue,stepSize):
-        paraMeterArray[key] = i
-        x.append(i)
-        y.append(simulate(paraMeterArray))
-
-    return x,y
-
-def testVary():
-
-    x,y = varyVariabel('preTensionOfLine',50,300,3)
-    figure(1)
-    grid()
-    plot(x,y)
-    title(' Pre tension of line')
-    xlabel("Pre tension [N]")
-    ylabel("Height [m]")
-    legend(['Phase 2','Phase 3','Phase 4'])
-    show()
-
-
-
-def plotMy():
-    global paraMeterArray
-    paraMeterArray = init()
-    print simulate([3])
-    initPlot(saveLogg(),counterPhase)
-    plotXY(0,1)
 
 
 def saveLogg():
@@ -757,7 +724,7 @@ def saveLogg():
                 'psi':_psi,
                 'gamma':_gamma,
                 'flapPos':_flapPos,
-                'lineLengthToPlane':_lineLengthToPlane,
+                'totalLineLength':_totalLineLength,
                 'velocity':_velocity,
                 'rho':_rho,
                 'clTotal':_clTotal,
@@ -773,24 +740,36 @@ def saveLogg():
                 'E':E,
                 'drumDiameter':_drumDiameter,
                 'momentOnWinchDrum':_momentOnWinchDrum,
-                'lineOnWinch':_lineOnWinch}
+                'lineOnWinch':_lineOnWinch,
+                'deltaLineLength':_deltaLineLength}
 
-    return loggArray
+    setArr = {'counterPhase':counterPhase,
+                'saveOn':saveOn,
+                'showOn':showOn,
+                'scalePlot':scalePlot,
+                'numbersOfVariationStepForPlots':numbersOfVariationStepForPlots,
+                'plotKey':plotKey,
+                'plotKeyArray':plotKeyArray,
+                'plotVer':plotVer}
 
+    return loggArray,setArr
+
+
+def getParametersArray():
+    return paraMeterArray
+
+def setParametersArray(paraMeterArray0):
+    global paraMeterArray
+    paraMeterArray = paraMeterArray0
 
 if __name__=="__main__":
 
     #lim = ([0,300],[0,50])
     #res=optimize.brute(simulate,lim,Ns=4)
-##    planeParameters = planeParameters0
-##    refHeight = simulate([0])
-##    plotSim(1)
+
     print "Start!!!!"
 
-    plotMy()
-    #testVary()
-
-    #sensitivity()
+    plotSelector()
 
     print "Done!!!!"
 

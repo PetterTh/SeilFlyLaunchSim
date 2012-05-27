@@ -113,16 +113,13 @@ def eval1(x):
     except: return x
     A = { eval1(y[0]) : eval1(y[1]) for y in [x.split() for x in open(filename).readlines()] }
 
-def getParametersArray():
-    return paraMeterArray
 
-def setParametersArray(paraMeterArray0):
-    global paraMeterArray
-    paraMeterArray = paraMeterArray0
 
-def saveFigMy():
-    _dictonary = getParametersArray()
-    myString = getDateString()
-    #savefig('Figures/' + myString + '.png')
-    writeDict(_dictonary,'Figures/' + myString + '.txt')
+
+
+def lengthToPlaneFromPulley(x,y):
+    """
+    Returns the actual length of the line
+    """
+    return (x**2+y**2)**0.5
 

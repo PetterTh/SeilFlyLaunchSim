@@ -34,6 +34,7 @@ def plotXY(showOn,saveOn):
             xlabel("X-Position [m]")
             ylabel(key)
             title(key)
+            grid()
         myString = getDateString()
         saveFigMy()
         savefig('Figures/' + myString + '.png')
@@ -42,6 +43,64 @@ def plotXY(showOn,saveOn):
     #plot(x,y)
 
 
+
+    if showOn:
+        show()
+    if saveOn:
+        myString = getDateString()
+        saveFigMy()
+        savefig('Figures/' + myString + '.png')
+
+def plotXYSingle(key,showOn,saveOn):
+
+
+    x = logg['x']
+    y = logg[key]
+
+    figure(1)
+    for index in range(0,len(counterPhase)-1):
+        plot(x[counterPhase[index]:counterPhase[index+1]],y[counterPhase[index]:counterPhase[index+1]],colors[index])
+        xlabel("X-Position [m]")
+        ylabel("Y-Position [m]")
+        title('Height plot')
+        grid()
+    myString = getDateString()
+    saveFigMy()
+    savefig('Figures/' + myString + '.png')
+
+def plotSingle(x,y,showOn,saveOn,figNum):
+
+    figure(figNum)
+    for index in range(0,len(counterPhase)-1):
+        plot(x[counterPhase[index]:counterPhase[index+1]],y[counterPhase[index]:counterPhase[index+1]],colors[index])
+        xlabel("X-Position [m]")
+        ylabel("Y-Position [m]")
+        title('Height plot')
+        grid()
+    myString = getDateString()
+    saveFigMy()
+    savefig('Figures/' + myString + '.png')
+
+    #plot(x,y)
+
+
+
+    if showOn:
+        show()
+    if saveOn:
+        myString = getDateString()
+        saveFigMy()
+        savefig('Figures/' + myString + '.png')
+
+def plotSingleNoColors(x,y,showOn,saveOn,figNum,key):
+
+    figure(figNum)
+    plot(x,y)
+    xlabel(key)
+    ylabel("Y-Position [m]")
+    title('Height different phases')
+    legend(['phase 2','phase 3','phase 4'])
+    grid()
 
     if showOn:
         show()

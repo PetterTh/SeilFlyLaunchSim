@@ -20,16 +20,27 @@ def Flift(cl,velocity,rho,wingArea):
     Flift = cl*v^2*rho*wingArea/2
     """
 
-    return cl*velocity**2*rho*wingArea/2
+    return cl*velocity*abs(velocity)*rho*wingArea/2
 
 
-def Fdrag(cd,velocity,rho,wingArea):
+def Fdrag(_cd,velocity,rho,wingArea):
     """
     Returns the grad force of the plane based on the input velocity
     Flift = cd*v^2*rho*wingArea/2
     """
 
-    return cd*velocity**2*rho*wingArea/2
+    return _cd*velocity*abs(velocity)*rho*wingArea/2
+
+def lineArea(diameter,length,_beta):
+    return diameter*length/3 #*np.sin(rad(_beta))/3
+
+def FlineDrag(_cd,_velocity,_rho,_lineArea,phase):
+    """
+    Returns the grad force of the plane based on the input velocity
+    Flift = cd*v^2*rho*wingArea/2
+    """
+    if phase>2:return 0
+    else: return _cd*_velocity*abs(_velocity)*_rho*_lineArea/2
 
 def velocityMin(flapPos):
     return 9
@@ -70,6 +81,8 @@ def cdInduced(AR,cdInducedFactor,cl):
     # 0.95 < cdInducedFactor < 1
     return cl**2/(np.pi*AR*cdInducedFactor)
 
+def cdLine():
+    return 0.69
 
 # Lift formulas
 def calcCl(attAng,clAlphaCoeff,speedFlapPos,startFlapPos,speedFlapCl0,startFlapCl0,flapPos):
