@@ -15,16 +15,42 @@ from pylab import *
 
 figNum = 1
 run = 2
+legendLabel = []
+numPlot = 0
+newFig = 1
+exclusiveSen = 0
 def plotSelector():
+    """
+    0: All available plot methods
+    1: x,y plot
+
+    2: x,plotkey
+    3: x, all pararmeters in logg array
+    4: x, plotKeyArray
+
+    5: plotKey, height
+    6: all pararmeters in paraMeterArray, height
+    7: plotKeyArray,height
+
+    8: all sensitivity plot
+    9: planeParameters sensitivity plot
+    10: flightParameters sensitivity plot
+    11: winchParameters sensitivity plot
+    12: lineParameters sensitivity plot
+    13: flighConditionsParameters sensitivity plot
+    14: plotKeyArray sensitivity plot
+
+    """
     global figNum,logg,scalePlot,fileName,x,y,yLabel,titleLabel,paraMeterArray
-    global saveOn,showOn,run
+    global saveOn,showOn,run,legendLabel,numPlot,newFig,exclusive,exclusiveSen
+    global plotKeyArray,inp
+
     paraMeterArray = ss.init()
-    print ss.simulate(paraMeterArray)
-    logg,setArr =ss.saveLogg()
+    setArr = ss.getPlotSettings()
     inp = setArr['plotVer']
+    exclusive = setArr['exclusive']
     plotKey = setArr['plotKey']
     plotKeyArray = setArr['plotKeyArray']
-    loopArray = logg
     colors = ["r","b","m","y","black","o"]
     showOn = setArr['showOn']
     saveOn = setArr['saveOn']
@@ -34,10 +60,12 @@ def plotSelector():
     xLabel = "X-Position [m]"
     yLabel = "Y-Position [m]"
     titleLabel = 'Height plot'
-    x = logg['x']
-    y = logg['y']
+    colorIndex = 0
+
     plotPhases = 1
     run = run-1
+    legendOn = 0
+    loopInp = 1
 
     if inp == 0:
         showOn = 0
@@ -45,59 +73,152 @@ def plotSelector():
         inp = 6
         if run:
             ss.sensitivity(paraMeterArray)
-            loopArray = paraMeterArray
+            loopInp = 2
+
     elif inp==1: # Single normal x,y plot
         fileName = 'Figures/Single/XY-Plot-'  + '.png'
     elif inp==2:
-        generateYArray(plotKey)
-    elif inp==5 or inp==6:
-        loopArray = paraMeterArray
-    elif inp==7:
-        ss.sensitivity(plotKeyArray)
+        loopInp = 3
+    elif inp==5 or inp==6 or inp == 7:
+        loopInp = 2
+    elif inp==8:
+        sensitivity(paraMeterArray)
+    elif inp==9:
+        sensitivity(ss.getPlaneParameters())
+    elif inp==10:
+        sensitivity(ss.getFlightParameters())
+    elif inp==11:
+        sensitivity(ss.getWinchParameters())
+    elif inp==12:
+        sensitivity(ss.getLineParameters())
+    elif inp==13:
+        sensitivity(ss.getFlighConditionsParameters())
+    elif inp==14:
+        exclusiveSen = exclusive
+        sensitivity(plotKeyArray)
+
+
+    elif inp==15:
+        colorIndex = numPlot
+        value = paraMeterArray[plotKey]
+        stepSize = ((float(value*1.3-value*.7)/numbers))
+        if run and (value*1.3 - (value*0.7+(numPlot+1)*stepSize))>0.00001 :
+            paraMeterArray[plotKey] = value*0.7+numPlot*stepSize
+            run = run+1
+            saveOn = 0
+            showOn = 0
+            if newFig:
+                newFig=0
+        else:
+            paraMeterArray[plotKey] = value*0.7+numPlot*stepSize
+            legendOn = 1
+            numPlot= -1
+
+        plotPhases = 0
+        legendLabel.append(plotKey + ':' + str(round(paraMeterArray[plotKey]*scalePlot,2)))
+        numPlot = numPlot + 1
+        fileName = 'Figures/Alt/' + plotKey + '-Plot-'  + '.png'
+
+    elif inp==16:
+        plotPhases = 0
+        colorIndex = numPlot
+
+        if run:
+            saveOn = 0
+            showOn = 0
+            if newFig:
+                newFig=0
+                paraMeterArray['preTensionOfLine'] = 0
+                run = run +1
+        else:
+            legendOn = 1
+
+        ss.setAlt(numPlot+1)
+        if numPlot==0:
+            legendLabel.append('Rolling on ground')
+        if numPlot==1:
+            legendLabel.append('Thrown in the air')
+        if numPlot==2:
+            legendLabel.append('No zooming')
+
+        numPlot = numPlot + 1
+
+        fileName = 'Figures/Alt/Alt-Plot-'  + '.png'
+
     else:
         fileName = 'Figures/Single/XY-Plot-'  + '.png'
 
+
+    ss.simulate(paraMeterArray)
+    logg =ss.saveLogg()
+    loopArray = logg
+    counterPhase = ss.getCounterPhases()
+
+    x = logg['x']
+    y = logg['y']
+
+    if loopInp ==1:
+        loopArray = logg
+    elif loopInp == 2:
+        loopArray = paraMeterArray
+    elif loopInp == 3:
+        generateYArray(plotKey)
+
     for myKey, value in loopArray.items():
-        figure(figNum)
+        plotThisKey = 0
         if inp == 3 or inp==4:
             scalePlot = 1
             generateYArray(myKey)
+        if myKey in plotKeyArray:
+            plotThisKey = 1
+        if exclusive:
+            plotThisKey = abs(plotThisKey-1)
 
+        if inp <= 3 or (inp==4 and plotThisKey ) or (inp==5 and myKey in plotKey) or inp==6 or (inp==7 and  myKey in plotKeyArray) or inp >=15 :
+            if (run and inp>=15 and newFig) or inp <=14:
+                figure(figNum)
+                hold(True)  # hold is on
 
-        if (inp==4 and myKey in plotKeyArray) or inp <= 3 or (inp==5 and myKey==plotKey) or inp ==6 or inp==0:
-
-            if inp == 5 or inp == 6:
+            if inp == 5 or inp == 6 or inp == 7:
                 x,y = varyVariabel(myKey,paraMeterArray[myKey]*0.7,paraMeterArray[myKey]*1.3,numbers)
+                if inp==5:
+                    x=array(x)*scalePlot
                 plotPhases = 0
                 fileName = 'Figures/Vary/'+ myKey +'Y-Plot-'  + '.png'
+                titleLabel = 'Height plot for differnet values of ' + myKey
+                xLabel = myKey
                 yLabel = "Height [m]"
-                legend(['Phase 2','Phase 3','Phase 4'])
+                legendLabel = ['Phase 2','Phase 3','Phase 4']
+                legendOn = 1
             if plotPhases:
                 for index in range(0,len(counterPhase)-1):
                     plot(x[counterPhase[index]:counterPhase[index+1]],y[counterPhase[index]:counterPhase[index+1]],colors[index])
             else:
-                plot(x,y)
+                plot(x,y,colors[colorIndex])
 
             xlabel(xLabel)
             ylabel(yLabel)
             title(titleLabel)
             grid()
 
+            if legendOn:
+                legend(legendLabel,loc='upper left')
+
             if saveOn:
                 savefig(fileName)
+            if newFig:
+                figNum = figNum +1
 
-            figNum = figNum +1
-
-            if inp<= 2:
+            if inp<= 2 or inp>=15:
                 break
 
     if showOn:
         show()
 
-    if run and inp == 0:
+    if run and (inp == 0 or inp >= 16 or numPlot):
         plotSelector()
 
-    print run
+
 
 def generateYArray(key):
     global y,fileName,yLabel,titleLabel,scalePlot
@@ -106,6 +227,8 @@ def generateYArray(key):
     yLabel = key
     titleLabel = key + ' plot'
     # getDateString()
+
+
 
 def varyVariabel(key,startValue,stopValue,numbers):
     global paraMeterArray
@@ -123,13 +246,20 @@ def varyVariabel(key,startValue,stopValue,numbers):
     return x,y
 
 def sensitivity(keyArray):
-    #global paraMeterArray
-    #planeParameters0,flightParameters0, winchParameters0,lineParameters0,flighConditionsParameters0
-    #paraMeterArray = init()
-    #testArray = paraMeterArray.copy()
     tempArray = {}
-    for i in keyArray:
-        tempArray[i]= paraMeterArray[i]
+    if exclusive and inp!=14:
+        for key in keyArray:
+            plotThisKey = 0
+            if key in plotKeyArray:
+                plotThisKey = 1
+            if exclusive:
+                plotThisKey = abs(plotThisKey-1)
+            if plotThisKey:
+                tempArray[key]= paraMeterArray[key]
+    else:
+        for i in keyArray:
+            tempArray[i]= paraMeterArray[i]
+
 
     keys,minVal,maxVal,minRes,maxRes = sensitivityCheck(tempArray)
     sensitivityMy,state,keys2 = sensitivityDelta(keys,minVal,maxVal,minRes,maxRes)
@@ -137,8 +267,10 @@ def sensitivity(keyArray):
     #printSensitivity(keys,minVal,maxVal,minRes,maxRes)
 
 def sensitivityDelta(keys,minVal,maxVal,minRes,maxRes):
-
-    maxValues = max(max(minRes),max(maxRes))
+    temp = zeros([2,4], float)
+    temp[0,:] = (minRes.max(axis=0))
+    temp[1,:] = (maxRes.max(axis=0))
+    maxValues = temp.max(axis=0)
 
     tempArray = abs(subtract(minRes,maxRes))
     tempArray2 = []
@@ -146,6 +278,9 @@ def sensitivityDelta(keys,minVal,maxVal,minRes,maxRes):
     s = ''
     s2 = ''
     test =len(tempArray)
+    # Here we loop through the difference array to check if we do have any differences..
+    # if there is no differences the parameter is most likely not be implemented
+    # if there is minor differences its taged minor and removed from array to make pie plot nicer
     for i in range(0,len(tempArray)):
         if tempArray[i,0] == 0:
             s = s + keys[i] + ', '
@@ -163,11 +298,14 @@ def sensitivityDelta(keys,minVal,maxVal,minRes,maxRes):
     if len(s2)>0:
         s= s + s2 +'minor effect on result'
 
-    #senstivityArrayTemp= (abs(subtract(minRes,maxRes))/maxValues)
+
     senstivityArrayTemp= tempArray2/maxValues
+
     summOfArray = senstivityArrayTemp.sum(axis=0)
 
+
     return senstivityArrayTemp/summOfArray,s,keys2
+
 
 def plotSensitivity(sensitivity,keys,state,exploded):
     global figNum,fileName
@@ -218,7 +356,9 @@ def sensitivityCheck(changeArray0):
         maxRes.append(ss.simulate(paraMeterArray))
         keys.append(key)
 
-    return keys,minVal,maxVal,minRes,maxRes
+
+    return keys,minVal,maxVal,array(minRes),array(maxRes)
+
 
 
 def printSensitivity(keys,minVal,maxVal,minRes,maxRes):

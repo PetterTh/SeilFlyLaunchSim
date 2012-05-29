@@ -13,37 +13,72 @@ from plotSensitivity import *
 from plotSelector import *
 
 paraMeterArray = {}
+master = 0
+exclusive = 0
+alt = 2
 saveOn= 1
 showOn = 1
-plotVer = 0
+plotVer = 2
 """
     0: All available plot methods
     1: x,y plot
+
     2: x,plotkey
     3: x, all pararmeters in logg array
     4: x, plotKeyArray
+
     5: plotKey, height
     6: all pararmeters in paraMeterArray, height
+    7: plotKeyArray,height
+
+    8: all sensitivity plot
+    9: planeParameters sensitivity plot
+    10: flightParameters sensitivity plot
+    11: winchParameters sensitivity plot
+    12: lineParameters sensitivity plot
+    13: flighConditionsParameters sensitivity plot
+    14: plotKeyArray sensitivity plot
+    15: x,y for different plotKey
+    16: x,y plot for different alternatives(alt)
+
 """
-plotKey = 'lineDiameter'
-#plotKey = 'wingSpan'
-plotKeyArray = ['lineDiameter','totalLineLength']
+#plotKey = 'preTensionOfLine'
+plotKey = 'ay'
+#plotKey = 'energy'
+#plotKeyArray = ['lineDiameter','totalLineLength']
 #plotKeyArray = ['lineDiameter','deltaLineLength','totalLineLength']
-scalePlot = 1000
+#plotKeyArray = ['distanceToPulley','totalLineLength']
+plotKeyArray = ['distanceToPulley']
+scalePlot = 1
 numbersOfVariationStepForPlots = 3
+counterPhase = []
+debug = 0
 # Some global parameters
+
+def getPlotSettings():
+    setArr = {'counterPhase':counterPhase,
+                'saveOn':saveOn,
+                'showOn':showOn,
+                'scalePlot':scalePlot,
+                'numbersOfVariationStepForPlots':numbersOfVariationStepForPlots,
+                'plotKey':plotKey,
+                'plotKeyArray':plotKeyArray,
+                'plotVer':plotVer,
+                'exclusive':exclusive}
+    return setArr
+
+def getCounterPhases():
+    return counterPhase
+
+def setAlt(type):
+    global alt
+    alt = type
 
 def init():
     global figureNumber,alt,debug
     global planeParameters0,flightParameters0, winchParameters0,lineParameters0,flighConditionsParameters0
     global paraMeterArray
 
-    figureNumber = 1
-    plotOn = 1
-    savePlot = 1
-    debug = 0
-
-    alt = 2
 
     """
         1: all phase flown
@@ -73,8 +108,8 @@ def init():
                                 'startFlapPos':10,
                                 'gammaR0':200,
                                 'gammaR1':200,
-                                'gammaR2':600,
-                                'gammaR3':400,
+                                'gammaR2':140,
+                                'gammaR3':50,
                                 'diveStartAngle':75,
                                 'speedFlapPos':-2.5,
                                 'thermicFlapPos':5,
@@ -125,8 +160,8 @@ def reset():
 
     #Flight parameters
     global clAlphaCoeff,speedFlapPos,startFlapPos,speedFlapCl0,startFlapCl0
-    global gamma0,gammaR1,gammaR2,preTensionOfLine,takeOffSpeed,setpointAOA
-    global flapPosPhase
+    global gammaR0,gammaR1,gammaR2,gammaR3,preTensionOfLine,takeOffSpeed,setpointAOA
+    global flapPosPhase,gamma0
 
     #Flight conditions parameters
     global humidity,pressureAtGround,tempAtGround,windSpeed,thermic,thermicCeil
@@ -324,9 +359,9 @@ def initSim():
     # rewrite all this ........
     gammaDesiredAngle0 = 100  # init for the climbangle
     if alt ==1:
-        gammaDesiredAngle = gammaDesiredAngle0 # Launch angle init
+        gammaDesiredAngle = 0#gammaDesiredAngle0 # Launch angle init
 
-    if alt == 2:
+    if alt >= 2:
         gammaDesiredAngle = gamma0 # Launch angle init
 
 
@@ -391,7 +426,19 @@ def loggingReset():
     _lineDrag = [0.0]
     _fTotalDrag = [0.0]
 
+def getPlaneParameters():
+    return planeParameters0
+def getFlightParameters():
+    return flightParameters0
 
+def getWinchParameters():
+    return winchParameters0
+def getLineParameters():
+    return lineParameters0
+def getFlighConditionsParameters():
+    return flighConditionsParameters0
+
+#########################################################################################################
 
 def calcVelAng():
     """
@@ -420,33 +467,49 @@ def calcGamma():
     Returns the plane angle.
     Assumes the plane flies with gamma0 degrees towards the line all the time
     """
-    if phase <=3:
+    if phase == 2:
+        gammaMyR = gammaR0 # radius of bottom of launch
+    elif phase==3:
         gammaMyR = gammaR1 # radius of top of zoom
-    else:
+    elif phase==4:
         gammaMyR = gammaR2 # radius of bottom of zoom
+    else:
+        gammaMyR = gammaR3 # radius of flatten
 
 
     goal = 0
     if phase == 0:
-        if alt==2:
+        if alt>=2:
             goal=gamma0+setpointAOA # Included to simplify things for the governor
         else:
-            goal=gamma0
+            goal=0#gamma0
     if phase == 1:
-        goal=gamma0
+        goal=0#gamma0
     if phase == 2:
         goal=gammaDesired()-_psi[-1]
     if phase == 3:
-       goal= -_psi[-1]
+        if alt==3:
+            goal = climbAngle
+        else:
+            goal= -_psi[-1]
     if phase == 4:
         goal=climbAngle
+    if phase == 5:
+        goal=0
     if goal < _gamma[-1]:
         loadVector = 1
         #flapPos = 0
-        return max(goal,_gamma[-1]-gammaMyR*dt)
+        return  max(goal,_gamma[-1]-gammaMyR*dt)
     elif goal > _gamma[-1]:
         #flapPos = 0
         loadVector = -1
+##        temp = min(goal,_gamma[-1]-gammaMyR*dt)
+##        if phase==5:
+##            if temp<0:
+##                return 0
+##            else:
+##                return temp
+
         return min(goal,_gamma[-1]+gammaMyR*dt)
 
     else:
@@ -605,6 +668,7 @@ def simulate(inp):
     global T,E
     global AR,cdInducedFactor,clTotal,cdParasiticSpeedFlap,cdParasiticStartFlap,flapPos,Re,refRe,ReCoeff,cdInference
     global phase,counterPhase,heightPhase,onLine,paraMeterArray
+    global _gamma,_u,_v,change
 
     """
     Runs the simulation
@@ -612,11 +676,12 @@ def simulate(inp):
     paraMeterArray = inp
     reset()
     teller = 0
-    heightPhase = [0.0]
-    counterPhase = [0]
+    heightPhase = []
+    counterPhase = []
     change = 0
     onLine = 1
-    while T[-1]<=Tmax and _y[-1] >= -10.0 and phase<5:
+    i = 1
+    while T[-1]<=Tmax and _y[-1] >= -10.0 and phase<6:
 
         _flapPos.append(flapPosPhase[phase])
         euler()
@@ -634,9 +699,12 @@ def simulate(inp):
             5: Climb is ended and plane is flying straight ahead with thermic setting.
 
         """
+        if phase>2 and i:
+            dt = dt * 5
+            i = 0
         # Change phases
         if _lineForce[-1]>preTensionOfLine and phase==0:
-            if alt==2: # Alt 2 does not contain any takeoff along the ground
+            if alt>=2: # Alt 2 does not contain any takeoff along the ground
                phase=2
                _u   = [np.cos(rad(gamma0))*takeOffSpeed ]      # Plane velocity in x direction [m/s]
                _v   = [np.sin(rad(gamma0))*takeOffSpeed ]      # Plane velocity in y direction [m/s]
@@ -649,6 +717,7 @@ def simulate(inp):
         if _velocity[-1]>takeOffSpeed and phase==1:
             phase = 2
             change = 1
+
         if _psi[-1] > diveStartAngle and phase ==2:
             phase = 3
             change = 1
@@ -658,14 +727,20 @@ def simulate(inp):
         if (_y[-1]<50 or _lineForce[-1]==0) and phase ==3:
             phase = 4
             change = 1
-            if _y[-1]<50:
-                print "diveHeight reached"
-            if _lineForce[-1]==0:
-                print "all lineForce used" ,heightPhase[-1]-_y[-1]
+##            if _y[-1]<50:
+##                print "diveHeight reached"
+##            if _lineForce[-1]==0:
+##                print "all lineForce used" ,heightPhase[-1]-_y[-1]
             onLine = 0
 
-        if _velocity[-1]<vMinMy and phase>3:
+        if _velocity[-1]<vMinMy*1.1 and phase>=3 and phase< 5:
             phase = 5
+            change = 1
+##            print _velocity[-1]-vMinMy
+
+
+        if (_gamma[-1]<=0 and phase>=5):
+            phase = 6
             change = 1
 
 
@@ -681,22 +756,15 @@ def simulate(inp):
             if debug:
                 print "Phase ", phase, ": T:",T[-1],"X:",_x[-1],"Y:",_y[-1]
 
-
-    heightPhase.append(_y[-1])
-    counterPhase.append(teller)
-    return heightPhase[2:-1]
-
-##
-##    if max(E)==0:
-##        return 1000
-##    else:
-##        return 1/max(E)
-
-
-
-
-
-
+    # This code snippets makes sure we set all height of all phases except of phase0,
+    # in case of failed launch, i.e line tear etc the returned array will have eqaul heights for the last elemnts.
+    returnArray = []
+    for i in range(0,4):
+        if i>=len(heightPhase)-1:
+            returnArray.append(returnArray[-1])
+        else:
+            returnArray.append(heightPhase[i+1])
+    return returnArray
 
 
 def simulateTemp(inp):
@@ -707,12 +775,6 @@ def simulateTemp(inp):
 
 
 def saveLogg():
-##    basicLogg = {'y' :_y,
-##                'velocity':_velocity,
-##                'lineForce':_lineForce,
-##                'energy':E,
-##                }
-
     loggArray = {'u':_u,
                 'v':_v,
                 'x':_x,
@@ -736,23 +798,16 @@ def saveLogg():
                 'kLine':_kLine,
                 'fx':_fx,
                 'fy':_fy,
-                'T':T,
-                'E':E,
+                'time':T,
+                'energy':E,
                 'drumDiameter':_drumDiameter,
                 'momentOnWinchDrum':_momentOnWinchDrum,
                 'lineOnWinch':_lineOnWinch,
                 'deltaLineLength':_deltaLineLength}
 
-    setArr = {'counterPhase':counterPhase,
-                'saveOn':saveOn,
-                'showOn':showOn,
-                'scalePlot':scalePlot,
-                'numbersOfVariationStepForPlots':numbersOfVariationStepForPlots,
-                'plotKey':plotKey,
-                'plotKeyArray':plotKeyArray,
-                'plotVer':plotVer}
 
-    return loggArray,setArr
+
+    return loggArray
 
 
 def getParametersArray():
@@ -762,14 +817,24 @@ def setParametersArray(paraMeterArray0):
     global paraMeterArray
     paraMeterArray = paraMeterArray0
 
+def masterPlot():
+    global plotKey,plotVer
+    plotVer = 15
+    plotSelector()
+    plotVer = 2
+    plotKey = 'energy'
+    plotSelector()
+
 if __name__=="__main__":
 
     #lim = ([0,300],[0,50])
     #res=optimize.brute(simulate,lim,Ns=4)
 
     print "Start!!!!"
-
-    plotSelector()
+    if master:
+       masterPlot()
+    else:
+        plotSelector()
 
     print "Done!!!!"
 

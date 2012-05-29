@@ -72,7 +72,7 @@ def lineDiameter(phase,D0,l0,deltaL):
     if phase >= 4:
         return D0
     else:
-        return np.sqrt(l0/(l0+deltaL))*D0
+        return D0 #np.sqrt(l0/(l0+deltaL))*D0
 
 def diameter():
     global drumDiameter,layersOnDrum

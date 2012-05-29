@@ -11,6 +11,16 @@
 from selFunc import *
 from SeilSim import *
 from plotSensitivity import *
+import commands
+import os
+
+
+
+def testPdf():
+    #pdflatex myfile
+    print os.popen('pdflatex myfile').read()
+    print commands.getstatusoutput('dir')
+    print commands.getstatusoutput('pdflatex myfile')
 
 
 def main():
@@ -42,4 +52,4 @@ def test3():
 
 if __name__ == '__main__':
     #testSensitivity()
-    test3()
+    testPdf()
