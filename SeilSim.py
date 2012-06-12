@@ -17,8 +17,8 @@ master = 0
 exclusive = 0
 alt = 2
 saveOn= 1
-showOn = 1
-plotVer = 2
+showOn = 0
+plotVer = 17
 """
     0: All available plot methods
     1: x,y plot
@@ -38,19 +38,20 @@ plotVer = 2
     12: lineParameters sensitivity plot
     13: flighConditionsParameters sensitivity plot
     14: plotKeyArray sensitivity plot
-    15: x,y for different plotKey
+    15: x,y for different values of plotKey
     16: x,y plot for different alternatives(alt)
+    17: all sensitivity
 
 """
 #plotKey = 'preTensionOfLine'
-plotKey = 'ay'
+plotKey = 'wingSpan'
 #plotKey = 'energy'
 #plotKeyArray = ['lineDiameter','totalLineLength']
 #plotKeyArray = ['lineDiameter','deltaLineLength','totalLineLength']
 #plotKeyArray = ['distanceToPulley','totalLineLength']
 plotKeyArray = ['distanceToPulley']
 scalePlot = 1
-numbersOfVariationStepForPlots = 3
+numbersOfVariationStepForPlots = 4
 counterPhase = []
 debug = 0
 # Some global parameters
@@ -108,8 +109,8 @@ def init():
                                 'startFlapPos':10,
                                 'gammaR0':200,
                                 'gammaR1':200,
-                                'gammaR2':140,
-                                'gammaR3':50,
+                                'gammaR2':550,
+                                'gammaR3':550,
                                 'diveStartAngle':75,
                                 'speedFlapPos':-2.5,
                                 'thermicFlapPos':5,
@@ -128,7 +129,7 @@ def init():
                                 'winchZeroSpeed':3800,
                                 'distanceToPulley':200};
 
-    flighConditionsParameters0 = {'windSpeed':0,
+    flighConditionsParameters0 = {'windSpeed':4,
                                 'thermic':5,
                                 'thermicCeil':600,
                                 'temperatureAtGround':25,
@@ -161,7 +162,7 @@ def reset():
     #Flight parameters
     global clAlphaCoeff,speedFlapPos,startFlapPos,speedFlapCl0,startFlapCl0
     global gammaR0,gammaR1,gammaR2,gammaR3,preTensionOfLine,takeOffSpeed,setpointAOA
-    global flapPosPhase,gamma0
+    global flapPosPhase,gamma0,diveStartAngle,climbAngle
 
     #Flight conditions parameters
     global humidity,pressureAtGround,tempAtGround,windSpeed,thermic,thermicCeil
@@ -170,17 +171,12 @@ def reset():
     global totalLineLength,EModule,lineDiameterMy
 
     #Winch parameters
-    global distanceToPulley,drumDiameter,wzs,wst,_lineOnWinch
+    global distanceToPulley,drumDiameter,wzs,wst,_lineOnWinch,drumLength
 
 
     # need to delete these
-    global gammaDesiredAngle
-    global integral,cdiVal,loadFactor,cdVal,clVal,M,rpm
-    global wingArea,AR,wingSpan,pm,counterPhase
-    global cdTotal,clTotal
+    global Re,refRe,ReCoeff
 
-    global AR,cdInducedFactor,clTotal,cdParasiticStartFlap,Re,refRe,ReCoeff,cdInference
-    global  diveStartAngle ,climbAngle
 
     setParametersArray(paraMeterArray)
 
@@ -426,6 +422,7 @@ def loggingReset():
     _lineDrag = [0.0]
     _fTotalDrag = [0.0]
 
+
 def getPlaneParameters():
     return planeParameters0
 def getFlightParameters():
@@ -554,7 +551,8 @@ def sumForces():
     global _lineForce,_fx,_fy,_kLine,_lineDiameter,_lineOnWinch
     global _lengthToPlaneFromPulley,_lineArea,_lineDrag,_fTotalDrag,_deltaLineLength
 
-    _velocity.append( sqrt((_u[-1]+ windSpeed)**2+ (_v[-1])**2))
+    _velocity.append( sqrt(abs(_u[-1]+ windSpeed)*(_u[-1]+ windSpeed)+ abs(_v[-1])*(_v[-1])))
+    vel2 = sqrt((_u[-1]+ windSpeed)**2 + (_v[-1])**2)
     _rho.append(densityWithHumidity(humidity,pressureAtGround,tempAtGround,_y[-1]))
 
     _psi.append(calcPsi())
@@ -569,7 +567,7 @@ def sumForces():
 
     if onLine:
         _totalLineLength.append(lineLength(_x[-1],_y[-1],distanceToPulley))
-
+        _drumDiameter.append(drumDiameter2(_lineOnWinch[-1],_drumDiameter[-1],drumLength))
         _momentOnWinchDrum.append(momentOnWinchDrum(_lineForce[-1],_drumDiameter[-1]))
         s = Swinch(_lineForce[-1],_drumDiameter[-1],wst,wzs,_momentOnWinchDrum[-1],dt)
         _lineOnWinch.append(_lineOnWinch[-1]+s)
@@ -600,9 +598,13 @@ def sumForces():
 
     if phase>0:
         gravityForce = g()*pm
-        _fDrag.append(Fdrag(_cdTotal[-1],_velocity[-1],_rho[-1],wingArea))
-        _fLift.append(Flift(_clTotal[-1],_velocity[-1],_rho[-1],wingArea))
-        _lineDrag.append(FlineDrag(cdLineMy,_velocity[-1],_rho[-1],_lineArea[-1],phase))
+
+##        _fDrag.append(Fdrag(_cdTotal[-1],_velocity[-1],_rho[-1],wingArea))
+##        _fLift.append(Flift(_clTotal[-1],_velocity[-1],_rho[-1],wingArea))
+##        _lineDrag.append(FlineDrag(cdLineMy,_velocity[-1],_rho[-1],_lineArea[-1],phase))
+        _fDrag.append(Fdrag(_cdTotal[-1],vel2,_rho[-1],wingArea))
+        _fLift.append(Flift(_clTotal[-1],vel2,_rho[-1],wingArea))
+        _lineDrag.append(FlineDrag(cdLineMy,vel2,_rho[-1],_lineArea[-1],phase))
     else:
         _fDrag.append(0)
         _fLift.append(0)
@@ -831,10 +833,16 @@ if __name__=="__main__":
     #res=optimize.brute(simulate,lim,Ns=4)
 
     print "Start!!!!"
-    if master:
+    if master==1:
        masterPlot()
+    elif master == -1:
+        paraMeterArray = init()
+        simulate(paraMeterArray)
+        _dict = saveLogg()
+        writeLatexTable(_dict)
     else:
         plotSelector()
+
 
     print "Done!!!!"
 

@@ -10,7 +10,7 @@
 #-------------------------------------------------------------------------------
 from selFunc import *
 import numpy as np
-
+layersOnDrum = 1
 def Swinch(_lineForce,_drumDiameter,_winchStallTorque,_winchZeroSpeed,
         _momentOnWinchDrum,_dt):
     """
@@ -74,10 +74,11 @@ def lineDiameter(phase,D0,l0,deltaL):
     else:
         return D0 #np.sqrt(l0/(l0+deltaL))*D0
 
-def diameter():
+def drumDiameter2(lineOnDrum,_drumDiameter,_drumWidth):
     global drumDiameter,layersOnDrum
-    if lw[-1]>50*n:
-        layersOnDrum
-        drumDiameter = drumDiameter+lineDiameter
 
-    return drumDiameter
+    if lineOnDrum>5000*layersOnDrum:
+        layersOnDrum = layersOnDrum + 1
+        drumDiameter = _drumDiameter+lineDiameter
+
+    return _drumDiameter

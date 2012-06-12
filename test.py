@@ -15,6 +15,15 @@ import commands
 import os
 
 
+def testTable():
+    a = {'cool':3,
+        'smooth':6}
+
+    writeLatexTable(a)
+
+
+##    for key in a:
+##        print "\\\\\n" .join(key)#,max(_dict[key])
 
 def testPdf():
     #pdflatex myfile
@@ -52,4 +61,4 @@ def test3():
 
 if __name__ == '__main__':
     #testSensitivity()
-    testPdf()
+    testTable()

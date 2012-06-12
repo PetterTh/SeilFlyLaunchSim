@@ -19,6 +19,7 @@ legendLabel = []
 numPlot = 0
 newFig = 1
 exclusiveSen = 0
+senstivityName = ''
 def plotSelector():
     """
     0: All available plot methods
@@ -43,7 +44,7 @@ def plotSelector():
     """
     global figNum,logg,scalePlot,fileName,x,y,yLabel,titleLabel,paraMeterArray
     global saveOn,showOn,run,legendLabel,numPlot,newFig,exclusive,exclusiveSen
-    global plotKeyArray,inp
+    global plotKeyArray,inp,senstivityName
 
     paraMeterArray = ss.init()
     setArr = ss.getPlotSettings()
@@ -96,14 +97,24 @@ def plotSelector():
     elif inp==14:
         exclusiveSen = exclusive
         sensitivity(plotKeyArray)
-
+    elif inp==17:
+        senstivityName = 'planePara'
+        sensitivity(ss.getPlaneParameters())
+        senstivityName = 'flightPara'
+        sensitivity(ss.getFlightParameters())
+        senstivityName = 'winchPara'
+        sensitivity(ss.getWinchParameters())
+        senstivityName = 'linePara'
+        sensitivity(ss.getLineParameters())
+        senstivityName = 'flightCondPara'
+        sensitivity(ss.getFlighConditionsParameters())
 
     elif inp==15:
         colorIndex = numPlot
         value = paraMeterArray[plotKey]
-        stepSize = ((float(value*1.3-value*.7)/numbers))
-        if run and (value*1.3 - (value*0.7+(numPlot+1)*stepSize))>0.00001 :
-            paraMeterArray[plotKey] = value*0.7+numPlot*stepSize
+        stepSize = ((float(value*1.5-value*.5)/numbers))
+        if run and (value*1.5 - (value*0.5+(numPlot+1)*stepSize))>0.00001 :
+            paraMeterArray[plotKey] = value*0.5+numPlot*stepSize
             run = run+1
             saveOn = 0
             showOn = 0
@@ -188,11 +199,14 @@ def plotSelector():
                 titleLabel = 'Height plot for differnet values of ' + myKey
                 xLabel = myKey
                 yLabel = "Height [m]"
-                legendLabel = ['Phase 2','Phase 3','Phase 4']
+                legendLabel = ['Phase 2','Phase 3','Phase 4','Phase 5']
                 legendOn = 1
+                colorIndex = [1,2,3,4]
             if plotPhases:
                 for index in range(0,len(counterPhase)-1):
                     plot(x[counterPhase[index]:counterPhase[index+1]],y[counterPhase[index]:counterPhase[index+1]],colors[index])
+            elif inp == 5 or inp == 6 or inp == 7 or inp==15:
+                plot(x,y)
             else:
                 plot(x,y,colors[colorIndex])
 
@@ -328,7 +342,7 @@ def plotSensitivity(sensitivity,keys,state,exploded):
         if len(state)>0:
             text(-1.2, -1.2, state, bbox=dict(facecolor='red', alpha=0.1))
 
-        fileName = 'Figures/Sensitivity/Height' + str(i+2) + '-Plot-'  + '.png'
+        fileName = 'Figures/Sensitivity/Height' + str(i+2) + '-Plot-' + senstivityName + '.png'
         figNum = figNum + 1
 
         if saveOn:
@@ -375,3 +389,34 @@ def saveFigMy(fileName):
     myString = getDateString()
     #savefig('Figures/' + myString + '.png')
     writeDict(_dictonary,fileName)
+
+def writeLatexTable(_dict):
+    dictlist = []
+    for key, value in _dict.iteritems():
+        temp = [key,value]
+        dictlist.append(temp)
+
+    f = open('test.txt','w')
+
+    print f,"""
+    \documentclass{article}
+
+    \usepackage{siunitx}
+
+    \begin{document}
+        \begin{table}
+            \begin{center}
+            \begin{tabular}{SSSS}
+    """
+
+    print f, " \\\\\n".join([" & ".join(map(str,line)) for line in dictlist])
+
+    print """
+            \end{tabular}
+      \end{center}
+    \end{table}
+    \end{document}
+    """
+
+    f.close()
+
