@@ -3,22 +3,23 @@ from scipy import optimize
 from math import *
 from pylab import *
 from random import *
-#from numarray import *
+
+from globalHolder import *
+from plotSelector import *
 
 from Lnd import *
 from selFunc import *
 from winch import *
-from plotSim import *
-from plotSensitivity import *
-from plotSelector import *
+
+
 
 paraMeterArray = {}
-master = 0
+master = -1
 exclusive = 0
 alt = 2
 saveOn= 1
-showOn = 0
-plotVer = 17
+showOn = 1
+setPlotVer(9)
 """
     0: All available plot methods
     1: x,y plot
@@ -43,33 +44,34 @@ plotVer = 17
     17: all sensitivity
 
 """
-#plotKey = 'preTensionOfLine'
-plotKey = 'wingSpan'
-#plotKey = 'energy'
+
+setPlotKey('energy')
 #plotKeyArray = ['lineDiameter','totalLineLength']
 #plotKeyArray = ['lineDiameter','deltaLineLength','totalLineLength']
 #plotKeyArray = ['distanceToPulley','totalLineLength']
 plotKeyArray = ['distanceToPulley']
 scalePlot = 1
-numbersOfVariationStepForPlots = 4
+numbersOfVariationStepForPlots = 1
 counterPhase = []
 debug = 0
 # Some global parameters
 
 def getPlotSettings():
-    setArr = {'counterPhase':counterPhase,
+    test = getPlotVer()
+    bbfh = getPlotKey()
+    setArr = {  'master':master,
+                'counterPhase':getCounterPhases(),
                 'saveOn':saveOn,
                 'showOn':showOn,
                 'scalePlot':scalePlot,
                 'numbersOfVariationStepForPlots':numbersOfVariationStepForPlots,
-                'plotKey':plotKey,
+                'plotKey':getPlotKey(),
                 'plotKeyArray':plotKeyArray,
-                'plotVer':plotVer,
+                'plotVer':getPlotVer(),
                 'exclusive':exclusive}
     return setArr
 
-def getCounterPhases():
-    return counterPhase
+
 
 def setAlt(type):
     global alt
@@ -129,8 +131,8 @@ def init():
                                 'winchZeroSpeed':3800,
                                 'distanceToPulley':200};
 
-    flighConditionsParameters0 = {'windSpeed':4,
-                                'thermic':5,
+    flighConditionsParameters0 = {'windSpeed':0,
+                                'thermic':0,
                                 'thermicCeil':600,
                                 'temperatureAtGround':25,
                                 'pressureAtGround':101325,
@@ -551,8 +553,13 @@ def sumForces():
     global _lineForce,_fx,_fy,_kLine,_lineDiameter,_lineOnWinch
     global _lengthToPlaneFromPulley,_lineArea,_lineDrag,_fTotalDrag,_deltaLineLength
 
-    _velocity.append( sqrt(abs(_u[-1]+ windSpeed)*(_u[-1]+ windSpeed)+ abs(_v[-1])*(_v[-1])))
-    vel2 = sqrt((_u[-1]+ windSpeed)**2 + (_v[-1])**2)
+    velX = abs(_u[-1]+ windSpeed)*(_u[-1]+ windSpeed)
+    velY = abs(_v[-1])*_v[-1]
+
+    vel2 = ( sqrt(velX+ velY))
+
+    _velocity.append( sqrt((_u[-1]+ windSpeed)**2 + (_v[-1])**2))
+
     _rho.append(densityWithHumidity(humidity,pressureAtGround,tempAtGround,_y[-1]))
 
     _psi.append(calcPsi())
@@ -669,7 +676,7 @@ def simulate(inp):
     global _flapPos,dt
     global T,E
     global AR,cdInducedFactor,clTotal,cdParasiticSpeedFlap,cdParasiticStartFlap,flapPos,Re,refRe,ReCoeff,cdInference
-    global phase,counterPhase,heightPhase,onLine,paraMeterArray
+    global phase,heightPhase,onLine,paraMeterArray
     global _gamma,_u,_v,change
 
     """
@@ -758,6 +765,8 @@ def simulate(inp):
             if debug:
                 print "Phase ", phase, ": T:",T[-1],"X:",_x[-1],"Y:",_y[-1]
 
+    setCounterPhase(counterPhase)
+
     # This code snippets makes sure we set all height of all phases except of phase0,
     # in case of failed launch, i.e line tear etc the returned array will have eqaul heights for the last elemnts.
     returnArray = []
@@ -819,13 +828,46 @@ def setParametersArray(paraMeterArray0):
     global paraMeterArray
     paraMeterArray = paraMeterArray0
 
+def masterTables():
+    tableSelector(0)
+    tableSelector(1)
+    tableSelector(2)
+    tableSelector(3)
+    tableSelector(4)
+    tableSelector(5)
+    tableSelector(6)
+
+
 def masterPlot():
-    global plotKey,plotVer
-    plotVer = 15
+
+    setPlotVer(2)
+    setPlotKey('energy')
     plotSelector()
-    plotVer = 2
-    plotKey = 'energy'
+
+    setPlotVer(16)
     plotSelector()
+
+    setPlotVer(1)
+    plotSelector()
+
+    setPlotVer(8)
+    plotSelector()
+
+    setPlotVer(9)
+    plotSelector()
+
+    setPlotVer(10)
+    plotSelector()
+
+    setPlotVer(11)
+    plotSelector()
+
+    setPlotVer(12)
+    plotSelector()
+
+    setPlotVer(13)
+    plotSelector()
+
 
 if __name__=="__main__":
 
@@ -834,14 +876,12 @@ if __name__=="__main__":
 
     print "Start!!!!"
     if master==1:
-       masterPlot()
+        masterPlot()
     elif master == -1:
-        paraMeterArray = init()
-        simulate(paraMeterArray)
-        _dict = saveLogg()
-        writeLatexTable(_dict)
+        masterTables()
     else:
-        plotSelector()
+        #wplotSelector()
+        tableSelector()
 
 
     print "Done!!!!"

@@ -115,6 +115,11 @@ def eval1(x):
 
 
 
+def vThermic(height,heightThermicCeil,vThermicCeil):
+    """
+    Returns the thermic windspeed
+    """
+    return vThermicCeil/heightThermicCeil*height
 
 
 def lengthToPlaneFromPulley(x,y):

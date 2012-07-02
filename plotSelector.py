@@ -44,10 +44,11 @@ def plotSelector():
     """
     global figNum,logg,scalePlot,fileName,x,y,yLabel,titleLabel,paraMeterArray
     global saveOn,showOn,run,legendLabel,numPlot,newFig,exclusive,exclusiveSen
-    global plotKeyArray,inp,senstivityName
+    global plotKeyArray,inp,senstivityName,folderName,master
 
     paraMeterArray = ss.init()
     setArr = ss.getPlotSettings()
+    master = setArr['master']
     inp = setArr['plotVer']
     exclusive = setArr['exclusive']
     plotKey = setArr['plotKey']
@@ -77,7 +78,8 @@ def plotSelector():
             loopInp = 2
 
     elif inp==1: # Single normal x,y plot
-        fileName = 'Figures/Single/XY-Plot-'  + '.png'
+        fileName = 'XY-Plot-'  + '.png'
+        folderName ='Figures/Single/'
     elif inp==2:
         loopInp = 3
     elif inp==5 or inp==6 or inp == 7:
@@ -128,7 +130,8 @@ def plotSelector():
         plotPhases = 0
         legendLabel.append(plotKey + ':' + str(round(paraMeterArray[plotKey]*scalePlot,2)))
         numPlot = numPlot + 1
-        fileName = 'Figures/Alt/' + plotKey + '-Plot-'  + '.png'
+        fileName =   plotKey + '-Plot-'  + '.png'
+        folderName ='Figures/Alt/'
 
     elif inp==16:
         plotPhases = 0
@@ -154,10 +157,12 @@ def plotSelector():
 
         numPlot = numPlot + 1
 
-        fileName = 'Figures/Alt/Alt-Plot-'  + '.png'
+        folderName = 'Figures/Alt/'
+        fileName = 'Alt-Plot-'  + '.png'
 
     else:
-        fileName = 'Figures/Single/XY-Plot-'  + '.png'
+        folderName = 'Figures/Single/'
+        fileName = 'XY-Plot-'  + '.png'
 
 
     ss.simulate(paraMeterArray)
@@ -195,7 +200,8 @@ def plotSelector():
                 if inp==5:
                     x=array(x)*scalePlot
                 plotPhases = 0
-                fileName = 'Figures/Vary/'+ myKey +'Y-Plot-'  + '.png'
+                fileName = myKey +'Y-Plot-'  + '.png'
+                folderName = 'Figures/Vary/'
                 titleLabel = 'Height plot for differnet values of ' + myKey
                 xLabel = myKey
                 yLabel = "Height [m]"
@@ -219,7 +225,9 @@ def plotSelector():
                 legend(legendLabel,loc='upper left')
 
             if saveOn:
-                savefig(fileName)
+                if master ==1:
+                    folderName = 'MasterFigures/'
+                savefig(folderName +fileName)
             if newFig:
                 figNum = figNum +1
 
@@ -229,15 +237,16 @@ def plotSelector():
     if showOn:
         show()
 
-    if run and (inp == 0 or inp >= 16 or numPlot):
+    if run>0 and (inp == 0 or inp >= 16 or numPlot):
         plotSelector()
 
 
 
 def generateYArray(key):
-    global y,fileName,yLabel,titleLabel,scalePlot
+    global y,fileName,yLabel,titleLabel,scalePlot,folderName
     y = array(logg[key]) * scalePlot
-    fileName = 'Figures/Single/X' + key + '-Plot-'  + '.png'
+    fileName = 'X' + key + '-Plot-'  + '.png'
+    folderName = 'Figures/Single/'
     yLabel = key
     titleLabel = key + ' plot'
     # getDateString()
@@ -322,7 +331,7 @@ def sensitivityDelta(keys,minVal,maxVal,minRes,maxRes):
 
 
 def plotSensitivity(sensitivity,keys,state,exploded):
-    global figNum,fileName
+    global figNum,fileName,folderName
 
     for i in range(0,3,2):
 
@@ -342,11 +351,14 @@ def plotSensitivity(sensitivity,keys,state,exploded):
         if len(state)>0:
             text(-1.2, -1.2, state, bbox=dict(facecolor='red', alpha=0.1))
 
-        fileName = 'Figures/Sensitivity/Height' + str(i+2) + '-Plot-' + senstivityName + '.png'
+        fileName = 'Height' + str(i+2) + '-Plot-' + senstivityName + '.png'
+        folderName = 'Figures/Sensitivity/'
         figNum = figNum + 1
 
         if saveOn:
-            savefig(fileName)
+            if master ==1:
+                folderName = 'MasterFigures/'
+            savefig(folderName + fileName)
         if showOn:
             show()
 
@@ -390,33 +402,83 @@ def saveFigMy(fileName):
     #savefig('Figures/' + myString + '.png')
     writeDict(_dictonary,fileName)
 
+def tableSelector(inp):
+     global fileNameTex
+     ss.init()
+
+
+     """
+        0: loggArray
+        9: planeParameters sensitivity data
+        10: flightParameters sensitivity data
+        11: winchParameters sensitivity data
+        12: lineParameters sensitivity data
+        13: flighConditionsParameters sensitivity data
+        14: plotKeyArray sensitivity data
+
+     """
+     if inp == 0:
+        _dictonary = ss.saveLogg()
+        fileNameTex = 'loggArray'
+     elif inp==1:
+        _dictonary = ss.getParametersArray()
+        fileNameTex = 'inputArray'
+     elif inp ==2:
+        _dictonary = ss.getPlaneParameters()
+        fileNameTex = 'planeParameters'
+     elif inp ==3:
+        _dictonary = ss.getFlightParameters()
+        fileNameTex = 'flightParameters'
+     elif inp ==4:
+        _dictonary = ss.getWinchParameters()
+        fileNameTex = 'winchParameters'
+     elif inp ==5:
+        _dictonary = ss.getLineParameters()
+        fileNameTex = 'lineParameters'
+     elif inp ==6:
+        _dictonary = ss.getFlighConditionsParameters()
+        fileNameTex = 'flightConditionsParameters'
+     else:
+        _dictonary = []
+        fileNameTex = 'error'
+
+     writeLatexTable(_dictonary)
+
+
 def writeLatexTable(_dict):
     dictlist = []
     for key, value in _dict.iteritems():
-        temp = [key,value]
+       #if len(value) > 1:
+         #   tempValue = max(value)
+        #else:
+         #   tempValue = value
+        #temp = [key,tempValue]
+
+        temp = [key,max(value,0)]
         dictlist.append(temp)
 
-    f = open('test.txt','w')
+    f = open('MasterTables/' + fileNameTex + '.tex','w')
 
-    print f,"""
-    \documentclass{article}
+    #f.write('\\documentclass{article}\n')
 
-    \usepackage{siunitx}
+    #f.write('\\usepackage{siunitx}\n')
 
-    \begin{document}
-        \begin{table}
-            \begin{center}
-            \begin{tabular}{SSSS}
-    """
+    #f.write('\\begin{document}\n')
+    #f.write('   \\begin{table}\n\r')
+    f.write('       \\begin{center}\n\r')
+    f.write('            \\begin{tabular}{|l|c|}\n\r')
+    f.write('               \\hline\n\r')
 
-    print f, " \\\\\n".join([" & ".join(map(str,line)) for line in dictlist])
+    f.write( "Description & Value  \\\\ \\hline \\hline \n\r")
 
-    print """
-            \end{tabular}
-      \end{center}
-    \end{table}
-    \end{document}
-    """
+    f.write( " \\\\ \\hline \n\r".join([" & ".join(map(str,line)) for line in dictlist]))
+
+    f.write(' \\\\ \\hline \n\r')
+    f.write('            \\end{tabular}\n\r')
+    f.write('        \\end{center}\n\r')
+    #f.write('    \\end{table}\n\r')
+    #f.write('\\end{document}\n')
+
 
     f.close()
 

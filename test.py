@@ -10,16 +10,13 @@
 #-------------------------------------------------------------------------------
 from selFunc import *
 from SeilSim import *
-from plotSensitivity import *
+from plotSelector import *
 import commands
 import os
 
 
 def testTable():
-    a = {'cool':3,
-        'smooth':6}
-
-    writeLatexTable(a)
+    tableSelector()
 
 
 ##    for key in a:
